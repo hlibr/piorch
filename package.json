@@ -8,7 +8,7 @@
     "lint": "eslint \".pi/extensions/**/*.ts\"",
     "format:check": "prettier --check \"**/*.{ts,md,json}\"",
     "format": "prettier --write \"**/*.{ts,md,json}\"",
-    "markdownlint": "markdownlint \"**/*.md\"",
+    "markdownlint": "markdownlint \"**/*.md\" --ignore node_modules",
     "test": "vitest run"
   },
   "devDependencies": {

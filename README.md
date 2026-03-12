@@ -13,7 +13,7 @@ Customizable PM → Dev → Verifier workflow for **pi** using an extension and 
 
 ## Repository Layout
 
-```
+```text
 .pi/
   extensions/workflow-orchestrator/
     index.ts
@@ -56,7 +56,7 @@ You’ll see:
 
 Stop with:
 
-```
+```text
 /workflow stop
 ```
 
@@ -65,7 +65,7 @@ Stop with:
 When a workflow is active, normal chat input is routed to the PM (commands still work).
 PM replies are shown in the main chat as:
 
-```
+```text
 PM: <message>
 ```
 
