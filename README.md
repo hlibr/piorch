@@ -142,6 +142,12 @@ Run `/reload` after changes.
 - Live ticker is UI‑only (not persisted).
 - Tasks can be stopped and messaged via `/workflow stop-task` and `/workflow message` (sessions are persisted per task stage).
 
+## TODO
+
+- Better UI (colors)
+- Fix user messages not appearing in chat
+- Expand tasks
+
 ## License
 
 MIT
