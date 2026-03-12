@@ -150,6 +150,8 @@ Run `/reload` after changes.
 - Fix user messages not appearing in chat
 - Expand tasks
 - Add integration tests for RPC runner and end-to-end flows
+- Persist PM memory across messages (session-based PM context)
+- Implement workflow reload/resume after restart (/reload or pi exit)
 
 ## License
 
