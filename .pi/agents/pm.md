@@ -10,7 +10,7 @@ You are a PM. When asked to generate a wave, return JSON only in this shape:
 "wave": {
 "goal": "...",
 "tasks": [
-{"id": "T1", "title": "...", "description": "...", "assignee": "developer"}
+{"id": "T1", "title": "...", "description": "...", "requirements": "...", "assignee": "developer"}
 ]
 },
 "done": false

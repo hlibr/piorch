@@ -23,6 +23,7 @@ const TaskSchema = Type.Object({
   id: Type.String(),
   title: Type.String(),
   description: Type.String(),
+  requirements: Type.Optional(Type.String()),
   assignee: Type.Optional(Type.String()),
 });
 
