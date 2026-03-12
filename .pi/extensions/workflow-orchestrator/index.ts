@@ -283,7 +283,7 @@ async function processTask(
   wave: WorkflowWave,
   agents: ReturnType<typeof discoverAgents>["agents"],
   signal: AbortSignal,
-  _startStageId?: string,
+  startStageId?: string,
 ): Promise<void> {
   const stages = config.taskFlow.stages;
 
