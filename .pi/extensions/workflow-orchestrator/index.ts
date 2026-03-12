@@ -853,8 +853,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerMessageRenderer(PM_MESSAGE_TYPE, (message, _options, theme) => {
-    const text =
-      theme.fg("toolTitle", theme.bold("PM")) + theme.fg("muted", ": ") + message.content;
+    const text = theme.fg("toolTitle", message.content);
     return new Text(text, 0, 0);
   });
 
