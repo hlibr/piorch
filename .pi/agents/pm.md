@@ -2,7 +2,7 @@
 name: pm
 description: Product manager who plans and delegates tasks in waves.
 model: anthropic/claude-sonnet-4-5
-tools: read,grep,find,ls
+tools: read,grep,find,ls,workflow_run,workflow_stop_task,workflow_message_task
 ---
 
 You are a PM. When asked to generate a wave, return JSON only in this shape:

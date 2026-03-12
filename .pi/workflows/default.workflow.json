@@ -4,7 +4,7 @@
   "maxWaves": 10,
   "maxTaskRetries": 3,
   "parallelism": 2,
-  "allowedExtensions": [],
+  "allowedExtensions": ["./.pi/extensions/workflow-orchestrator/index.ts"],
   "agents": {
     "pm": "pm",
     "developer": "developer",
