@@ -77,6 +77,7 @@ Edit `.pi/workflows/default.workflow.json` to customize:
 - retries and parallelism
 - allowedExtensions (whitelist extensions for all subagents)
 - allowedExtensionsByAgent (per-agent extension allowlists)
+- task requirements (optional `requirements` field, passed only to verifier)
 
 ### Agents
 
