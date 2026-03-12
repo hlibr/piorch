@@ -40,6 +40,7 @@ Reload extensions:
   `.pi/workflows/sessions/<runId>/<taskId>-<stage>.jsonl`
 - `/workflow stop-task <id>` aborts a task but keeps session context.
 - `/workflow message <id> <text>` sends a steer message to the running task, or resumes a stopped task.
+- `/workflow resume` restarts the workflow loop from the saved state without starting new agents automatically.
 - While workflow is active, normal chat is routed to PM (commands still work).
 
 ## UI notes

@@ -462,6 +462,35 @@ async function processTask(
   });
 }
 
+async function runWaveWithTasks(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  config: WorkflowConfig,
+  wave: WorkflowWave,
+  tasks: TaskState[],
+  agents: ReturnType<typeof discoverAgents>["agents"],
+  signal: AbortSignal,
+): Promise<void> {
+  const newState: WorkflowState = {
+    ...currentState!,
+    wave,
+    tasks,
+    updatedAt: Date.now(),
+    previousSummary: currentState?.previousSummary,
+    waveSummaries: currentState?.waveSummaries ?? [],
+  };
+  setState(pi, ctx, newState);
+
+  const runnable = tasks.filter(
+    (task) =>
+      task.status === "pending" || task.status === "in_progress" || task.status === "stopped",
+  );
+
+  await mapWithConcurrencyLimit(runnable, config.parallelism ?? 1, async (task) =>
+    processTask(pi, ctx, config, task, wave, agents, signal, task.stageId),
+  );
+}
+
 async function runWave(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
@@ -471,17 +500,7 @@ async function runWave(
   signal: AbortSignal,
 ): Promise<void> {
   const tasks = wave.tasks.map(buildTaskState);
-  const newState: WorkflowState = {
-    ...currentState!,
-    wave,
-    tasks,
-    updatedAt: Date.now(),
-  };
-  setState(pi, ctx, newState);
-
-  await mapWithConcurrencyLimit(tasks, config.parallelism ?? 1, async (task) =>
-    processTask(pi, ctx, config, task, wave, agents, signal),
-  );
+  await runWaveWithTasks(pi, ctx, config, wave, tasks, agents, signal);
 }
 
 function disposePmRunner() {
@@ -559,6 +578,126 @@ async function generateWaveFromPm(
   const wave = output.wave as WorkflowWave;
   sendPmMessage(pi, summarizeWave(wave));
   return { done: false, wave };
+}
+
+async function resumeWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext): Promise<void> {
+  if (currentRun) {
+    if (ctx.hasUI) ctx.ui.notify("Workflow already running", "warning");
+    return;
+  }
+  if (!currentState) {
+    if (ctx.hasUI) ctx.ui.notify("No workflow state to resume", "warning");
+    return;
+  }
+
+  const { config } = loadWorkflowConfig(ctx.cwd, currentState.workflowName);
+  const { agents } = discoverAgents(ctx.cwd);
+  const effectiveConfig: WorkflowConfig = { ...config, goal: currentState.goal };
+
+  const abortController = new AbortController();
+  const runPromise = (async () => {
+    try {
+      setState(pi, ctx, { ...currentState!, active: true });
+      sendWorkflowNotice(pi, "Workflow resumed.");
+
+      let previousSummary = currentState?.previousSummary ?? "";
+
+      for (
+        let waveIndex = currentState!.waveIndex;
+        waveIndex < (effectiveConfig.maxWaves ?? 10);
+        waveIndex++
+      ) {
+        if (abortController.signal.aborted) throw new Error("Workflow aborted");
+
+        let wave: WorkflowWave | undefined;
+        let tasks: TaskState[] | undefined;
+        const hasExistingWave =
+          waveIndex === currentState!.waveIndex &&
+          currentState?.wave &&
+          currentState.tasks.length > 0;
+
+        if (hasExistingWave) {
+          wave = currentState!.wave;
+          tasks = currentState!.tasks;
+        } else if (effectiveConfig.waveSource.type === "static") {
+          wave = effectiveConfig.waveSource.staticWaves?.[waveIndex];
+        } else {
+          const pmResult = await generateWaveFromPm(
+            pi,
+            effectiveConfig,
+            agents,
+            ctx,
+            abortController.signal,
+            previousSummary,
+          );
+          if (pmResult.done) {
+            break;
+          }
+          wave = pmResult.wave;
+        }
+
+        if (!wave) break;
+
+        if (!tasks) {
+          tasks = wave.tasks.map(buildTaskState);
+        }
+
+        const updatedState: WorkflowState = {
+          ...currentState!,
+          waveIndex,
+          wave,
+          tasks,
+          updatedAt: Date.now(),
+          previousSummary,
+          waveSummaries: currentState?.waveSummaries ?? [],
+          active: true,
+        };
+        setState(pi, ctx, updatedState);
+
+        await runWaveWithTasks(
+          pi,
+          ctx,
+          effectiveConfig,
+          wave,
+          tasks,
+          agents,
+          abortController.signal,
+        );
+
+        previousSummary = buildWaveSummary(currentState!);
+        const summaries = currentState?.waveSummaries ?? [];
+        const nextSummaries = [...summaries, previousSummary];
+        if (currentState) {
+          setState(pi, ctx, {
+            ...currentState,
+            previousSummary,
+            waveSummaries: nextSummaries,
+          });
+        }
+      }
+
+      const finalState: WorkflowState = {
+        ...currentState!,
+        active: false,
+        updatedAt: Date.now(),
+      };
+      setState(pi, ctx, finalState);
+      sendWorkflowNotice(pi, "Workflow completed.");
+      if (ctx.hasUI) ctx.ui.notify("Workflow completed", "info");
+    } catch (error: any) {
+      const message = error?.message || "Workflow failed";
+      sendWorkflowNotice(pi, `Workflow error: ${message}`);
+      if (ctx.hasUI) ctx.ui.notify(message, "error");
+      if (currentState) {
+        setState(pi, ctx, { ...currentState, active: false, updatedAt: Date.now() });
+      }
+    } finally {
+      disposePmRunner();
+      currentRun = null;
+    }
+  })();
+
+  currentRun = { abortController, promise: runPromise };
 }
 
 async function startWorkflow(
@@ -698,7 +837,11 @@ function stopWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext): void {
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     currentState = restoreState(ctx);
-    if (currentState) updateStatus(ctx, currentState);
+    if (currentState?.active) {
+      setState(pi, ctx, { ...currentState, active: false });
+    } else if (currentState) {
+      updateStatus(ctx, currentState);
+    }
     setPmStatus(ctx, undefined);
     taskRunners.clear();
     disposePmRunner();
@@ -771,6 +914,7 @@ export default function (pi: ExtensionAPI) {
           [
             "Workflow commands:",
             "  /workflow start <name> [goal]",
+            "  /workflow resume",
             "  /workflow status",
             "  /workflow stop",
             "  /workflow stop-task <id>",
@@ -790,6 +934,11 @@ export default function (pi: ExtensionAPI) {
           return;
         }
         void startWorkflow(pi, ctx, name, goalText);
+        return;
+      }
+
+      if (command === "resume") {
+        void resumeWorkflow(pi, ctx);
         return;
       }
 
@@ -864,14 +1013,24 @@ export default function (pi: ExtensionAPI) {
       }
 
       ctx.ui?.notify(
-        "Usage: /workflow start|status|stop|stop-task|message|expand|collapse",
+        "Usage: /workflow start|resume|status|stop|stop-task|message|expand|collapse",
         "warning",
       );
     },
   });
 
   pi.registerMessageRenderer(PM_MESSAGE_TYPE, (message, _options, theme) => {
-    const text = theme.fg("toolTitle", message.content);
+    const content =
+      typeof message.content === "string"
+        ? message.content
+        : message.content
+            .map((part) => {
+              if (typeof part === "string") return part;
+              if (part.type === "text") return part.text;
+              return "";
+            })
+            .join("");
+    const text = theme.fg("toolTitle", content);
     return new Text(text, 0, 0);
   });
 
