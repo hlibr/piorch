@@ -377,6 +377,7 @@ async function processTask(
       t.stageId = workflowStage.id;
       t.lastAgent = workflowStage.agent;
       t.lastNote = "running";
+      t.lastOutput = undefined;
       setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
     },
     runStage: async (stage, t) => {
