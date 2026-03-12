@@ -149,7 +149,12 @@ function buildWaveSummary(state: WorkflowState): string {
   const lines = state.tasks.map((task) => {
     const status =
       task.status === "verified" ? "verified" : task.status === "failed" ? "failed" : task.status;
-    return `${task.id}: ${task.title} (${status})`;
+    const note = task.lastNote ? ` — ${task.lastNote}` : "";
+    const issues = task.issues?.length ? ` issues: ${task.issues.join("; ")}` : "";
+    const filesChanged = Array.isArray((task.devOutput as any)?.filesChanged)
+      ? ` files: ${(task.devOutput as any).filesChanged.join(", ")}`
+      : "";
+    return `${task.id}: ${task.title} (${status})${note}${issues}${filesChanged}`;
   });
   return lines.join("\n");
 }
@@ -589,7 +594,6 @@ async function generateWaveFromPm(
   previousSummary: string,
 ): Promise<{ done: boolean; wave?: WorkflowWave }> {
   const prompt = [
-    `Project goal: ${config.goal}`,
     previousSummary ? `Previous wave summary:\n${previousSummary}` : "No previous wave summary.",
     "Return the next wave JSON response.",
   ].join("\n\n");
