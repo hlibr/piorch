@@ -4,6 +4,12 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Message } from "@mariozechner/pi-ai";
 
+export type AgentRunUpdate =
+  | { type: "text_delta"; delta: string }
+  | { type: "tool_start"; toolName: string; args: any }
+  | { type: "tool_update"; toolName: string; partialResult: any }
+  | { type: "tool_end"; toolName: string; isError: boolean };
+
 export interface AgentRunInput {
   name: string;
   task: string;
@@ -12,6 +18,7 @@ export interface AgentRunInput {
   model?: string;
   tools?: string[];
   signal?: AbortSignal;
+  onUpdate?: (update: AgentRunUpdate) => void;
 }
 
 export interface AgentRunResult {
@@ -78,6 +85,23 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
       } catch {
         return;
       }
+
+      if (event.type === "message_update" && event.assistantMessageEvent?.type === "text_delta") {
+        input.onUpdate?.({ type: "text_delta", delta: event.assistantMessageEvent.delta ?? "" });
+      }
+
+      if (event.type === "tool_execution_start") {
+        input.onUpdate?.({ type: "tool_start", toolName: event.toolName, args: event.args });
+      }
+
+      if (event.type === "tool_execution_update") {
+        input.onUpdate?.({ type: "tool_update", toolName: event.toolName, partialResult: event.partialResult });
+      }
+
+      if (event.type === "tool_execution_end") {
+        input.onUpdate?.({ type: "tool_end", toolName: event.toolName, isError: event.isError });
+      }
+
       if (event.type === "message_end" && event.message) {
         const msg = event.message as Message;
         messages.push(msg);

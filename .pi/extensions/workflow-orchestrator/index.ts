@@ -14,10 +14,10 @@ interface WorkflowRunHandle {
 let currentRun: WorkflowRunHandle | null = null;
 let currentState: WorkflowState | undefined;
 
-function setState(pi: ExtensionAPI, ctx: ExtensionCommandContext, state: WorkflowState) {
+function setState(pi: ExtensionAPI, ctx: ExtensionCommandContext, state: WorkflowState, persist = true) {
   const nextState = { ...state, updatedAt: Date.now() };
   currentState = nextState;
-  appendState(pi, nextState);
+  if (persist) appendState(pi, nextState);
   updateStatus(ctx, nextState);
 }
 
@@ -57,6 +57,35 @@ function normalizeGoal(goal?: string): string | undefined {
     return trimmed.slice(1, -1).trim();
   }
   return trimmed;
+}
+
+const MAX_OUTPUT_LINES = 40;
+const MAX_TOOL_ARGS_LENGTH = 160;
+
+function truncateLines(text: string): string {
+  const lines = text.split("\n");
+  if (lines.length <= MAX_OUTPUT_LINES) return text;
+  const tail = lines.slice(-MAX_OUTPUT_LINES);
+  const skipped = lines.length - tail.length;
+  return [`… ${skipped} lines trimmed`, ...tail].join("\n");
+}
+
+function appendOutput(task: TaskState, chunk: string, mode: "delta" | "line") {
+  const current = task.lastOutput ?? "";
+  const next = mode === "line" ? (current ? `${current}\n${chunk}` : chunk) : current + chunk;
+  task.lastOutput = truncateLines(next);
+}
+
+function formatToolArgs(args: unknown): string {
+  if (!args) return "";
+  let json = "";
+  try {
+    json = JSON.stringify(args);
+  } catch {
+    json = String(args);
+  }
+  if (json.length > MAX_TOOL_ARGS_LENGTH) return `${json.slice(0, MAX_TOOL_ARGS_LENGTH)}...`;
+  return json;
 }
 
 async function mapWithConcurrencyLimit<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>): Promise<void> {
@@ -142,10 +171,28 @@ async function processTask(
         model: agent.model,
         tools: agent.tools,
         signal,
+        onUpdate: (update) => {
+          if (!currentState) return;
+          if (update.type === "text_delta") {
+            appendOutput(task, update.delta, "delta");
+            setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] }, false);
+            return;
+          }
+          if (update.type === "tool_start") {
+            task.lastNote = `tool: ${update.toolName}`;
+            appendOutput(task, `→ ${update.toolName} ${formatToolArgs(update.args)}`.trim(), "line");
+            setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] }, false);
+            return;
+          }
+          if (update.type === "tool_end") {
+            appendOutput(task, `← ${update.toolName} ${update.isError ? "error" : "done"}`.trim(), "line");
+            setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] }, false);
+          }
+        },
       });
       if (result.exitCode !== 0) throw new Error(result.stderr || "Agent failed");
       const outputText = result.outputText || "";
-      task.lastOutput = outputText;
+      task.lastOutput = truncateLines(outputText);
       output = extractJson(outputText);
       if (typeof output?.status === "string") {
         task.lastNote = `status: ${output.status}`;
@@ -157,7 +204,7 @@ async function processTask(
     } catch (error: any) {
       const message = error?.message || "Agent output parse failed";
       task.lastNote = `error: ${message}`;
-      task.lastOutput = message;
+      task.lastOutput = truncateLines(message);
       if (stage.id === "verify") {
         task.verifyOutput = { status: "fail", issues: [message] };
         task.issues = [message];
