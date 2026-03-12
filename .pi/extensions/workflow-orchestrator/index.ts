@@ -293,9 +293,10 @@ async function processTask(
     maxRetries: config.maxTaskRetries ?? 2,
     isStopped: (t) => t.status === "stopped" || signal.aborted,
     onStageStart: (stage, t) => {
+      const workflowStage = stage as WorkflowStage;
       t.status = "in_progress";
-      t.stageId = stage.id;
-      t.lastAgent = stage.agent;
+      t.stageId = workflowStage.id;
+      t.lastAgent = workflowStage.agent;
       t.lastNote = "running";
       setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
     },
