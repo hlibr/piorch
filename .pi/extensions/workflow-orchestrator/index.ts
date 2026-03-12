@@ -591,11 +591,13 @@ async function startWorkflow(
         tasks: [],
         updatedAt: Date.now(),
         allowedExtensions: effectiveConfig.allowedExtensions,
+        previousSummary: "",
+        waveSummaries: [],
       };
       setState(pi, ctx, initialState);
       sendWorkflowNotice(pi, `Workflow started: ${effectiveConfig.goal}`);
 
-      let previousSummary = "";
+      let previousSummary = initialState.previousSummary ?? "";
 
       for (let waveIndex = 0; waveIndex < (effectiveConfig.maxWaves ?? 10); waveIndex++) {
         if (abortController.signal.aborted) throw new Error("Workflow aborted");
@@ -629,12 +631,23 @@ async function startWorkflow(
           wave,
           tasks: [],
           updatedAt: Date.now(),
+          previousSummary,
+          waveSummaries: currentState?.waveSummaries ?? [],
         };
         setState(pi, ctx, updatedState);
 
         await runWave(pi, ctx, effectiveConfig, wave, agents, abortController.signal);
 
         previousSummary = buildWaveSummary(currentState!);
+        const summaries = currentState?.waveSummaries ?? [];
+        const nextSummaries = [...summaries, previousSummary];
+        if (currentState) {
+          setState(pi, ctx, {
+            ...currentState,
+            previousSummary,
+            waveSummaries: nextSummaries,
+          });
+        }
       }
 
       const finalState: WorkflowState = {

@@ -27,6 +27,8 @@ export interface WorkflowState {
   tasks: TaskState[];
   updatedAt: number;
   allowedExtensions?: string[];
+  previousSummary?: string;
+  waveSummaries?: string[];
 }
 
 export const STATE_TYPE = "workflow-state";
