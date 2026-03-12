@@ -88,7 +88,6 @@ function appendOutput(task: TaskState, chunk: string, mode: "delta" | "line") {
   task.lastOutput = truncateTicker(chunk.replace(/\s+/g, " ").trim());
 }
 
-
 function sendPmMessage(pi: ExtensionAPI, text: string) {
   pi.sendMessage({
     customType: PM_MESSAGE_TYPE,
@@ -117,6 +116,11 @@ function buildWaveSummary(state: WorkflowState): string {
     return `${task.id}: ${task.title} (${status})`;
   });
   return lines.join("\n");
+}
+
+function summarizeWave(wave: WorkflowWave): string {
+  const lines = wave.tasks.map((task) => `${task.id}: ${task.title}`);
+  return [`PM generated wave: ${wave.goal}`, ...lines].join("\n");
 }
 
 function buildPmChatPrompt(state: WorkflowState, message: string): string {
@@ -222,7 +226,6 @@ async function processTask(
             return;
           }
           if (update.type === "tool_start") {
-            task.lastNote = `tool: ${update.toolName}`;
             appendOutput(task, `tool ${update.toolName}`, "line");
             setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] }, false);
           }
@@ -230,8 +233,6 @@ async function processTask(
       });
       if (result.exitCode !== 0) throw new Error(result.stderr || "Agent failed");
       const outputText = result.outputText || "";
-      const firstLine = outputText.split("\n")[0] ?? "";
-      task.lastOutput = truncateTicker(firstLine.trim());
       output = extractJson(outputText);
       if (typeof output?.status === "string") {
         task.lastNote = `status: ${output.status}`;
@@ -240,6 +241,8 @@ async function processTask(
       } else {
         task.lastNote = "completed";
       }
+      const tickerSource = typeof output?.summary === "string" ? output.summary : outputText.split("\n")[0] ?? "";
+      task.lastOutput = truncateTicker(tickerSource.trim());
     } catch (error: any) {
       const message = error?.message || "Agent output parse failed";
       task.lastNote = `error: ${message}`;
@@ -378,12 +381,16 @@ async function generateWaveFromPm(
   ].join("\n\n");
 
   const outputText = await runPmAgent(pi, config, agents, ctx, signal, prompt);
-  sendPmMessage(pi, outputText);
 
   const output = extractJson(outputText || "");
-  if (output.done === true) return { done: true };
+  if (output.done === true) {
+    sendPmMessage(pi, "PM reports: all work is complete.");
+    return { done: true };
+  }
   if (!output.wave) throw new Error("PM output missing wave");
-  return { done: false, wave: output.wave as WorkflowWave };
+  const wave = output.wave as WorkflowWave;
+  sendPmMessage(pi, summarizeWave(wave));
+  return { done: false, wave };
 }
 
 async function startWorkflow(
