@@ -38,4 +38,36 @@ describe("loadWorkflowConfig", () => {
     expect(loaded.config.name).toBe("temp");
     expect(loaded.config.parallelism).toBe(1);
   });
+
+  it("accepts requirements and per-agent extensions", () => {
+    const config = {
+      name: "temp",
+      goal: "test",
+      agents: { pm: "pm", developer: "dev", verifier: "ver" },
+      allowedExtensionsByAgent: { pm: ["/ext/pm.ts"], developer: [], verifier: [] },
+      waveSource: {
+        type: "static",
+        staticWaves: [
+          {
+            goal: "g",
+            tasks: [
+              {
+                id: "T1",
+                title: "Task",
+                description: "Do the thing",
+                requirements: "Verify the thing",
+                assignee: "developer",
+              },
+            ],
+          },
+        ],
+      },
+      taskFlow: { stages: [{ id: "develop", agent: "dev", inputTemplate: "x", outputSchema: {} }] },
+    };
+    const { cwd, name } = setupTempConfig(JSON.stringify(config));
+    const loaded = loadWorkflowConfig(cwd, name);
+    const task = loaded.config.waveSource.staticWaves?.[0].tasks[0];
+    expect(task?.requirements).toBe("Verify the thing");
+    expect(loaded.config.allowedExtensionsByAgent?.pm?.[0]).toBe("/ext/pm.ts");
+  });
 });
