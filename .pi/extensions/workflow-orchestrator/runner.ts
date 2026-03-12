@@ -327,7 +327,8 @@ export class RpcAgent {
     if (event.type === "message_end" && event.message?.role === "assistant") {
       const msg = event.message as Message;
       for (const part of msg.content) {
-        if (part.type === "text") this.currentRun!.lastAssistantText = part.text;
+        if (typeof part === "string") this.currentRun!.lastAssistantText = part;
+        else if (part.type === "text") this.currentRun!.lastAssistantText = part.text;
       }
     }
 

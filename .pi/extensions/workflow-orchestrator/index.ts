@@ -300,6 +300,7 @@ async function processTask(
       setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
     },
     runStage: async (stage, t) => {
+      const workflowStage = stage as WorkflowStage;
       const templateData = {
         task: {
           ...t,
@@ -311,13 +312,13 @@ async function processTask(
         wave: { goal: wave.goal, index: currentState?.waveIndex ?? 0 },
       };
 
-      let taskPrompt = renderTemplate(stage.inputTemplate, templateData as Record<string, unknown>);
+      let taskPrompt = renderTemplate(workflowStage.inputTemplate, templateData as Record<string, unknown>);
       if (t.resumeMessage) {
         taskPrompt = `${taskPrompt}\n\nAdditional instruction:\n${t.resumeMessage}`;
         t.resumeMessage = undefined;
       }
 
-      const runner = getTaskRunner(ctx, t, stage, stage.agent, agents);
+      const runner = getTaskRunner(ctx, t, workflowStage, workflowStage.agent, agents);
       const outputText = await runner.agent.runPrompt(taskPrompt, {
         onUpdate: (update) => {
           if (!currentState) return;
@@ -746,7 +747,7 @@ export default function (pi: ExtensionAPI) {
       const goal = normalizeGoal(params.goal);
       const command = goal ? `/workflow start ${params.name} "${goal}"` : `/workflow start ${params.name}`;
       pi.sendUserMessage(command, { deliverAs: "followUp" });
-      return { content: [{ type: "text", text: `Queued workflow start: ${params.name}` }] };
+      return { content: [{ type: "text", text: `Queued workflow start: ${params.name}` }], details: {} };
     },
   });
 
@@ -758,12 +759,12 @@ export default function (pi: ExtensionAPI) {
       id: Type.String({ description: "Task id" }),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      if (!currentState) return { content: [{ type: "text", text: "No workflow state." }] };
+      if (!currentState) return { content: [{ type: "text", text: "No workflow state." }], details: {} };
       const task = findTask(params.id);
-      if (!task) return { content: [{ type: "text", text: `Task not found: ${params.id}` }] };
+      if (!task) return { content: [{ type: "text", text: `Task not found: ${params.id}` }], details: {} };
       stopTask(task);
       setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
-      return { content: [{ type: "text", text: `Stopped task ${params.id}` }] };
+      return { content: [{ type: "text", text: `Stopped task ${params.id}` }], details: {} };
     },
   });
 
@@ -776,13 +777,13 @@ export default function (pi: ExtensionAPI) {
       message: Type.String({ description: "Message to send" }),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      if (!currentState) return { content: [{ type: "text", text: "No workflow state." }] };
+      if (!currentState) return { content: [{ type: "text", text: "No workflow state." }], details: {} };
       const task = findTask(params.id);
-      if (!task) return { content: [{ type: "text", text: `Task not found: ${params.id}` }] };
+      if (!task) return { content: [{ type: "text", text: `Task not found: ${params.id}` }], details: {} };
       const { config } = loadWorkflowConfig(ctx.cwd, currentState.workflowName);
       const { agents } = discoverAgents(ctx.cwd);
       await messageTask(pi, ctx, config, task, params.message, agents);
-      return { content: [{ type: "text", text: `Sent message to task ${params.id}` }] };
+      return { content: [{ type: "text", text: `Sent message to task ${params.id}` }], details: {} };
     },
   });
 }
