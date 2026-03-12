@@ -6,7 +6,7 @@ Customizable PM → Dev → Verifier workflow for **pi** using an extension and 
 
 - PM‑driven or static task waves
 - Dev/Verifier loop with retries
-- Live per‑task ticker status (single line)
+- Live per‑task ticker status (compact two-line per active task)
 - PM chat in the main pi conversation
 - Per‑agent model selection
 - Persistent workflow state in the session
@@ -50,6 +50,7 @@ The extension is auto‑discovered from `.pi/extensions/workflow-orchestrator`.
 
 You’ll see:
 - A widget above the editor with live per‑task status and a PM line
+- Active tasks show an indented ticker line with recent tool/text updates
 - PM responses in the main chat (summarized wave output, not raw JSON)
 
 Stop with:
