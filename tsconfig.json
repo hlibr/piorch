@@ -9,5 +9,5 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["node"]
   },
-  "include": [".pi/extensions/**/*.ts"]
+  "include": [".pi/extensions/**/*.ts", "tests/**/*.ts"]
 }
