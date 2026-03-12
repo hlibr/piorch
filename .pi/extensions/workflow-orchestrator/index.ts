@@ -17,7 +17,7 @@ import {
 } from "./config.js";
 import { runTaskFlow } from "./engine.js";
 import { setPmWidgetStatus, setTaskListExpanded, updateStatus } from "./render.js";
-import { RpcAgent, runAgent } from "./runner.js";
+import { RpcAgent } from "./runner.js";
 import { appendState, restoreState, type TaskState, type WorkflowState } from "./state.js";
 
 interface WorkflowRunHandle {
@@ -36,6 +36,7 @@ interface TaskRunner {
 let currentRun: WorkflowRunHandle | null = null;
 let currentState: WorkflowState | undefined;
 let pmBusy = false;
+let pmRunner: RpcAgent | null = null;
 const taskRunners = new Map<string, TaskRunner>();
 
 function setState(pi: ExtensionAPI, ctx: ExtensionContext, state: WorkflowState, persist = true) {
@@ -204,6 +205,12 @@ function ensureSessionFile(state: WorkflowState, task: TaskState, stageId: strin
     task.sessionFiles[stageId] = path.join(workflowDir, `${task.id}-${stageId}.jsonl`);
   }
   return task.sessionFiles[stageId]!;
+}
+
+function ensurePmSessionFile(state: WorkflowState): string {
+  const workflowDir = path.join(".pi", "workflows", "sessions", state.runId);
+  fs.mkdirSync(workflowDir, { recursive: true });
+  return path.join(workflowDir, "pm.jsonl");
 }
 
 function getRunnerKey(taskId: string, stageId: string): string {
@@ -472,6 +479,36 @@ async function runWave(
   );
 }
 
+function disposePmRunner() {
+  if (!pmRunner) return;
+  pmRunner.abort();
+  pmRunner.dispose();
+  pmRunner = null;
+}
+
+function getPmRunner(
+  ctx: ExtensionContext,
+  config: WorkflowConfig,
+  agents: ReturnType<typeof discoverAgents>["agents"],
+): RpcAgent {
+  if (!currentState) throw new Error("No workflow state");
+  if (pmRunner) return pmRunner;
+
+  const pmAgent = findAgentByName(agents, config.agents.pm);
+  if (!pmAgent) throw new Error(`PM agent not found: ${config.agents.pm}`);
+
+  const sessionFile = ensurePmSessionFile(currentState);
+  pmRunner = new RpcAgent({
+    cwd: ctx.cwd,
+    sessionFile,
+    systemPrompt: pmAgent.systemPrompt,
+    model: pmAgent.model,
+    tools: pmAgent.tools,
+    allowedExtensions: currentState.allowedExtensions,
+  });
+  return pmRunner;
+}
+
 async function runPmAgent(
   pi: ExtensionAPI,
   config: WorkflowConfig,
@@ -480,24 +517,12 @@ async function runPmAgent(
   signal: AbortSignal,
   prompt: string,
 ): Promise<string> {
-  const pmAgent = findAgentByName(agents, config.agents.pm);
-  if (!pmAgent) throw new Error(`PM agent not found: ${config.agents.pm}`);
   if (pmBusy) throw new Error("PM is already running");
   pmBusy = true;
   setPmStatus(ctx, "PM: responding...");
   try {
-    const result = await runAgent({
-      name: pmAgent.name,
-      task: prompt,
-      cwd: ctx.cwd,
-      systemPrompt: pmAgent.systemPrompt,
-      model: pmAgent.model,
-      tools: pmAgent.tools,
-      signal,
-      allowedExtensions: currentState?.allowedExtensions,
-    });
-    if (result.exitCode !== 0) throw new Error(result.stderr || "PM agent failed");
-    return result.outputText || "";
+    const runner = getPmRunner(ctx, config, agents);
+    return await runner.runPrompt(prompt, { signal });
   } finally {
     pmBusy = false;
     setPmStatus(ctx, undefined);
@@ -623,6 +648,7 @@ async function startWorkflow(
         setState(pi, ctx, { ...currentState, active: false, updatedAt: Date.now() });
       }
     } finally {
+      disposePmRunner();
       currentRun = null;
     }
   })();
@@ -642,6 +668,7 @@ function stopWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext): void {
     runner.agent.dispose();
   }
   taskRunners.clear();
+  disposePmRunner();
   if (currentState) {
     currentState.active = false;
     setState(pi, ctx, currentState);
@@ -656,6 +683,7 @@ export default function (pi: ExtensionAPI) {
     if (currentState) updateStatus(ctx, currentState);
     setPmStatus(ctx, undefined);
     taskRunners.clear();
+    disposePmRunner();
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
@@ -668,6 +696,7 @@ export default function (pi: ExtensionAPI) {
       runner.agent.dispose();
     }
     taskRunners.clear();
+    disposePmRunner();
     if (currentState) {
       currentState.active = false;
       currentState.tasks = currentState.tasks.map((task) => {

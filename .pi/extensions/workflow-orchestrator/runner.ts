@@ -40,6 +40,7 @@ export interface RpcAgentOptions {
 
 export interface RpcRunOptions {
   onUpdate?: (update: AgentRunUpdate) => void;
+  signal?: AbortSignal;
 }
 
 interface RpcRunState {
@@ -47,6 +48,7 @@ interface RpcRunState {
   reject: (error: Error) => void;
   lastAssistantText: string;
   onUpdate?: (update: AgentRunUpdate) => void;
+  aborted?: boolean;
 }
 
 function writePromptToTempFile(
@@ -271,6 +273,19 @@ export class RpcAgent {
         onUpdate: options?.onUpdate,
       };
 
+      if (options?.signal) {
+        const onAbort = () => {
+          const run = this.currentRun;
+          if (!run) return;
+          run.aborted = true;
+          this.currentRun = null;
+          this.abort();
+          reject(new Error("Aborted"));
+        };
+        if (options.signal.aborted) onAbort();
+        else options.signal.addEventListener("abort", onAbort, { once: true });
+      }
+
       this.send({ type: "prompt", message });
     });
   }
@@ -359,6 +374,7 @@ export class RpcAgent {
       const run = this.currentRun;
       if (!run) return;
       this.currentRun = null;
+      if (run.aborted) return;
       run.resolve(run.lastAssistantText || "");
     }
   }
