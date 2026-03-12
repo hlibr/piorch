@@ -36,8 +36,8 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
   });
 
   const theme = ctx.ui.theme;
-  const maxWidth = 50;
-  const maxTasks = 2;
+  const maxWidth = 80;
+  const maxTasks = 4;
   const lines: string[] = [];
 
   lines.push(theme.fg("toolTitle", shorten(`Workflow: ${state.workflowName}`, maxWidth)));
@@ -49,8 +49,10 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
     const stage = task.stageId ? ` (${task.stageId})` : "";
     const agent = task.lastAgent ? ` [${task.lastAgent}]` : "";
     const note = task.lastNote ? ` — ${task.lastNote}` : "";
-    const title = shorten(task.title, maxWidth);
-    lines.push(theme.fg("toolOutput", shorten(`${tag} ${task.id}: ${title}${stage}${agent}${note}`, maxWidth)));
+    const header = `${tag} ${task.id}${agent}${stage}`;
+    const remainingWidth = Math.max(20, maxWidth - header.length - note.length - 2);
+    const title = shorten(task.title, remainingWidth);
+    lines.push(theme.fg("toolOutput", shorten(`${header}: ${title}${note}`, maxWidth)));
 
     if (task.status === "in_progress" && task.lastOutput) {
       lines.push(theme.fg("dim", shorten(`↳ ${task.lastOutput}`, maxWidth)));
