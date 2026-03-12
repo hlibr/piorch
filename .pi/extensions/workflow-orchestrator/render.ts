@@ -28,7 +28,7 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
   const status = `Wave ${state.waveIndex + 1}: ${verified}/${total} verified${failed ? `, ${failed} failed` : ""}`;
   ctx.ui.setStatus("workflow", status);
 
-  const order = { in_progress: 0, pending: 1, verified: 2, failed: 3 } as const;
+  const order = { in_progress: 0, pending: 1, stopped: 2, verified: 3, failed: 4 } as const;
   const sortedTasks = [...state.tasks].sort((a, b) => {
     const aOrder = order[a.status] ?? 9;
     const bOrder = order[b.status] ?? 9;
@@ -45,7 +45,16 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
 
   const visibleTasks = sortedTasks.slice(0, maxTasks);
   for (const task of visibleTasks) {
-    const tag = task.status === "verified" ? "✓" : task.status === "failed" ? "✗" : task.status === "in_progress" ? "…" : "•";
+    const tag =
+      task.status === "verified"
+        ? "✓"
+        : task.status === "failed"
+          ? "✗"
+          : task.status === "stopped"
+            ? "⏸"
+            : task.status === "in_progress"
+              ? "…"
+              : "•";
     const stage = task.stageId ? ` (${task.stageId})` : "";
     const agent = task.lastAgent ? ` [${task.lastAgent}]` : "";
     const note = task.lastNote ? ` — ${task.lastNote}` : "";

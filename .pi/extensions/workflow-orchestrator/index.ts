@@ -1,10 +1,12 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { Text } from "@mariozechner/pi-tui";
 import { discoverAgents, findAgentByName } from "./agents.js";
 import { loadWorkflowConfig, type WorkflowConfig, type WorkflowStage, type WorkflowTask, type WorkflowWave } from "./config.js";
 import { setPmWidgetStatus, updateStatus } from "./render.js";
-import { runAgent } from "./runner.js";
+import { RpcAgent, runAgent } from "./runner.js";
 import { appendState, restoreState, type TaskState, type WorkflowState } from "./state.js";
 
 interface WorkflowRunHandle {
@@ -14,11 +16,18 @@ interface WorkflowRunHandle {
 
 const PM_MESSAGE_TYPE = "workflow-pm";
 
+interface TaskRunner {
+  key: string;
+  agent: RpcAgent;
+  stageId: string;
+}
+
 let currentRun: WorkflowRunHandle | null = null;
 let currentState: WorkflowState | undefined;
 let pmBusy = false;
+const taskRunners = new Map<string, TaskRunner>();
 
-function setState(pi: ExtensionAPI, ctx: ExtensionCommandContext, state: WorkflowState, persist = true) {
+function setState(pi: ExtensionAPI, ctx: ExtensionContext, state: WorkflowState, persist = true) {
   const nextState = { ...state, updatedAt: Date.now() };
   currentState = nextState;
   if (persist) appendState(pi, nextState);
@@ -168,6 +177,92 @@ function buildTaskState(task: WorkflowTask): TaskState {
   };
 }
 
+function ensureSessionFile(state: WorkflowState, task: TaskState, stageId: string): string {
+  const workflowDir = path.join(".pi", "workflows", "sessions", state.runId);
+  fs.mkdirSync(workflowDir, { recursive: true });
+  if (!task.sessionFiles) task.sessionFiles = {};
+  if (!task.sessionFiles[stageId]) {
+    task.sessionFiles[stageId] = path.join(workflowDir, `${task.id}-${stageId}.jsonl`);
+  }
+  return task.sessionFiles[stageId]!;
+}
+
+function getRunnerKey(taskId: string, stageId: string): string {
+  return `${taskId}:${stageId}`;
+}
+
+function findTask(taskId: string): TaskState | undefined {
+  return currentState?.tasks.find((task) => task.id === taskId);
+}
+
+function getTaskRunner(
+  ctx: ExtensionContext,
+  task: TaskState,
+  stage: WorkflowStage,
+  agentName: string,
+  agents: ReturnType<typeof discoverAgents>["agents"],
+): TaskRunner {
+  if (!currentState) throw new Error("No workflow state");
+  const key = getRunnerKey(task.id, stage.id);
+  const existing = taskRunners.get(key);
+  if (existing) return existing;
+
+  const agent = findAgentByName(agents, agentName);
+  if (!agent) throw new Error(`Agent not found: ${agentName}`);
+
+  const sessionFile = ensureSessionFile(currentState, task, stage.id);
+  const runner = new RpcAgent({
+    cwd: ctx.cwd,
+    sessionFile,
+    systemPrompt: agent.systemPrompt,
+    model: agent.model,
+    tools: agent.tools,
+  });
+
+  const taskRunner: TaskRunner = { key, agent: runner, stageId: stage.id };
+  taskRunners.set(key, taskRunner);
+  return taskRunner;
+}
+
+function stopTask(task: TaskState) {
+  if (!task.stageId) return;
+  const key = getRunnerKey(task.id, task.stageId);
+  const runner = taskRunners.get(key);
+  runner?.agent.abort();
+  task.status = "stopped";
+  task.lastNote = "stopped";
+}
+
+async function messageTask(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  config: WorkflowConfig,
+  task: TaskState,
+  message: string,
+  agents: ReturnType<typeof discoverAgents>["agents"],
+) {
+  if (!task.stageId) throw new Error("Task has no active stage");
+  const stage = findStageById(config.taskFlow.stages, task.stageId);
+  if (!stage) throw new Error(`Stage not found: ${task.stageId}`);
+
+  const key = getRunnerKey(task.id, task.stageId);
+  const runner = taskRunners.get(key);
+  if (runner) {
+    runner.agent.sendSteer(message);
+    task.lastNote = "running";
+    task.status = "in_progress";
+    setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
+    return;
+  }
+
+  if (!currentState?.wave) throw new Error("No active wave");
+  task.resumeMessage = message;
+  task.lastNote = "running";
+  task.status = "in_progress";
+  setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
+  void processTask(pi, ctx, config, task, currentState.wave, agents, new AbortController().signal, task.stageId);
+}
+
 function findStageById(stages: WorkflowStage[], id: string): WorkflowStage | undefined {
   return stages.find((stage) => stage.id === id);
 }
@@ -180,18 +275,20 @@ function getNextStageId(stages: WorkflowStage[], currentStageId: string): string
 
 async function processTask(
   pi: ExtensionAPI,
-  ctx: ExtensionCommandContext,
+  ctx: ExtensionContext,
   config: WorkflowConfig,
   task: TaskState,
   wave: WorkflowWave,
   agents: ReturnType<typeof discoverAgents>["agents"],
   signal: AbortSignal,
+  startStageId?: string,
 ): Promise<void> {
   const stages = config.taskFlow.stages;
-  let currentStageId = stages[0]?.id;
+  let currentStageId = startStageId ?? stages[0]?.id;
 
   while (currentStageId) {
     if (signal.aborted) throw new Error("Workflow aborted");
+    if (task.status === "stopped") return;
 
     const stage = findStageById(stages, currentStageId);
     if (!stage) throw new Error(`Stage not found: ${currentStageId}`);
@@ -203,9 +300,6 @@ async function processTask(
     setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
 
     const agentName = stage.agent;
-    const agent = findAgentByName(agents, agentName);
-    if (!agent) throw new Error(`Agent not found: ${agentName}`);
-
     const templateData = {
       task: {
         ...task,
@@ -217,18 +311,16 @@ async function processTask(
       wave: { goal: wave.goal, index: currentState?.waveIndex ?? 0 },
     };
 
-    const taskPrompt = renderTemplate(stage.inputTemplate, templateData as Record<string, unknown>);
+    let taskPrompt = renderTemplate(stage.inputTemplate, templateData as Record<string, unknown>);
+    if (task.resumeMessage) {
+      taskPrompt = `${taskPrompt}\n\nAdditional instruction:\n${task.resumeMessage}`;
+      task.resumeMessage = undefined;
+    }
 
     let output: any;
     try {
-      const result = await runAgent({
-        name: agent.name,
-        task: taskPrompt,
-        cwd: ctx.cwd,
-        systemPrompt: agent.systemPrompt,
-        model: agent.model,
-        tools: agent.tools,
-        signal,
+      const runner = getTaskRunner(ctx, task, stage, agentName, agents);
+      const outputText = await runner.agent.runPrompt(taskPrompt, {
         onUpdate: (update) => {
           if (!currentState) return;
           if (update.type === "text_delta") {
@@ -242,8 +334,9 @@ async function processTask(
           }
         },
       });
-      if (result.exitCode !== 0) throw new Error(result.stderr || "Agent failed");
-      const outputText = result.outputText || "";
+
+      if (task.status === "stopped") return;
+
       output = extractJson(outputText);
       if (typeof output?.status === "string") {
         task.lastNote = String(output.status);
@@ -255,6 +348,7 @@ async function processTask(
       const tickerSource = typeof output?.summary === "string" ? output.summary : outputText.split("\n")[0] ?? "";
       task.lastOutput = truncateTicker(tickerSource.trim());
     } catch (error: any) {
+      if (task.status === "stopped") return;
       const message = error?.message || "Agent output parse failed";
       task.lastNote = `error: ${message}`;
       task.lastOutput = truncateTicker(message);
@@ -338,7 +432,7 @@ async function processTask(
 
 async function runWave(
   pi: ExtensionAPI,
-  ctx: ExtensionCommandContext,
+  ctx: ExtensionContext,
   config: WorkflowConfig,
   wave: WorkflowWave,
   agents: ReturnType<typeof discoverAgents>["agents"],
@@ -514,6 +608,7 @@ function stopWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext): void {
   }
   currentRun.abortController.abort();
   currentRun = null;
+  for (const runner of taskRunners.values()) runner.agent.abort();
   if (currentState) {
     currentState.active = false;
     setState(pi, ctx, currentState);
@@ -527,6 +622,7 @@ export default function (pi: ExtensionAPI) {
     currentState = restoreState(ctx);
     if (currentState) updateStatus(ctx, currentState);
     setPmStatus(ctx, undefined);
+    taskRunners.clear();
   });
 
   pi.on("input", async (event, ctx) => {
@@ -568,6 +664,8 @@ export default function (pi: ExtensionAPI) {
             "  /workflow start <name> [goal]",
             "  /workflow status",
             "  /workflow stop",
+            "  /workflow stop-task <id>",
+            "  /workflow message <id> <message>",
             "Example:",
             "  /workflow start default \"Build a Telegram bot\"",
           ].join("\n"),
@@ -598,7 +696,51 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      ctx.ui?.notify("Usage: /workflow start|status|stop", "warning");
+      if (command === "stop-task") {
+        if (!currentState) {
+          ctx.ui?.notify("No workflow state", "info");
+          return;
+        }
+        if (!name) {
+          ctx.ui?.notify("Usage: /workflow stop-task <id>", "warning");
+          return;
+        }
+        const task = findTask(name);
+        if (!task) {
+          ctx.ui?.notify(`Task not found: ${name}`, "warning");
+          return;
+        }
+        stopTask(task);
+        setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
+        return;
+      }
+
+      if (command === "message") {
+        if (!currentState) {
+          ctx.ui?.notify("No workflow state", "info");
+          return;
+        }
+        if (!name) {
+          ctx.ui?.notify("Usage: /workflow message <id> <message>", "warning");
+          return;
+        }
+        const message = tokens.slice(2).join(" ");
+        if (!message) {
+          ctx.ui?.notify("Usage: /workflow message <id> <message>", "warning");
+          return;
+        }
+        const task = findTask(name);
+        if (!task) {
+          ctx.ui?.notify(`Task not found: ${name}`, "warning");
+          return;
+        }
+        const { config } = loadWorkflowConfig(ctx.cwd, currentState.workflowName);
+        const { agents } = discoverAgents(ctx.cwd);
+        void messageTask(pi, ctx, config, task, message, agents);
+        return;
+      }
+
+      ctx.ui?.notify("Usage: /workflow start|status|stop|stop-task|message", "warning");
     },
   });
 
@@ -620,6 +762,42 @@ export default function (pi: ExtensionAPI) {
       const command = goal ? `/workflow start ${params.name} "${goal}"` : `/workflow start ${params.name}`;
       pi.sendUserMessage(command, { deliverAs: "followUp" });
       return { content: [{ type: "text", text: `Queued workflow start: ${params.name}` }] };
+    },
+  });
+
+  pi.registerTool({
+    name: "workflow_stop_task",
+    label: "Workflow Stop Task",
+    description: "Stop a task by id without discarding progress.",
+    parameters: Type.Object({
+      id: Type.String({ description: "Task id" }),
+    }),
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      if (!currentState) return { content: [{ type: "text", text: "No workflow state." }] };
+      const task = findTask(params.id);
+      if (!task) return { content: [{ type: "text", text: `Task not found: ${params.id}` }] };
+      stopTask(task);
+      setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
+      return { content: [{ type: "text", text: `Stopped task ${params.id}` }] };
+    },
+  });
+
+  pi.registerTool({
+    name: "workflow_message_task",
+    label: "Workflow Message Task",
+    description: "Send a message to a running task or resume a stopped task.",
+    parameters: Type.Object({
+      id: Type.String({ description: "Task id" }),
+      message: Type.String({ description: "Message to send" }),
+    }),
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      if (!currentState) return { content: [{ type: "text", text: "No workflow state." }] };
+      const task = findTask(params.id);
+      if (!task) return { content: [{ type: "text", text: `Task not found: ${params.id}` }] };
+      const { config } = loadWorkflowConfig(ctx.cwd, currentState.workflowName);
+      const { agents } = discoverAgents(ctx.cwd);
+      await messageTask(pi, ctx, config, task, params.message, agents);
+      return { content: [{ type: "text", text: `Sent message to task ${params.id}` }] };
     },
   });
 }

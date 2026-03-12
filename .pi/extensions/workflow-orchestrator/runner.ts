@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -28,6 +28,25 @@ export interface AgentRunResult {
   exitCode: number;
 }
 
+export interface RpcAgentOptions {
+  cwd: string;
+  sessionFile: string;
+  systemPrompt: string;
+  model?: string;
+  tools?: string[];
+}
+
+export interface RpcRunOptions {
+  onUpdate?: (update: AgentRunUpdate) => void;
+}
+
+interface RpcRunState {
+  resolve: (value: string) => void;
+  reject: (error: Error) => void;
+  lastAssistantText: string;
+  onUpdate?: (update: AgentRunUpdate) => void;
+}
+
 function writePromptToTempFile(agentName: string, prompt: string): { dir: string; filePath: string } {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-workflow-"));
   const safeName = agentName.replace(/[^\w.-]+/g, "_");
@@ -49,7 +68,15 @@ function getFinalOutput(messages: Message[]): string {
 }
 
 export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
-  const args: string[] = ["--mode", "json", "-p", "--no-session", "--no-extensions", "--no-skills", "--no-prompt-templates"];
+  const args: string[] = [
+    "--mode",
+    "json",
+    "-p",
+    "--no-session",
+    "--no-extensions",
+    "--no-skills",
+    "--no-prompt-templates",
+  ];
   if (input.model) args.push("--model", input.model);
   if (input.tools && input.tools.length > 0) args.push("--tools", input.tools.join(","));
 
@@ -158,4 +185,170 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     }
 
   return { outputText, messages, stderr, exitCode };
+}
+
+export class RpcAgent {
+  private proc: ChildProcessWithoutNullStreams | null = null;
+  private buffer = "";
+  private stderr = "";
+  private currentRun: RpcRunState | null = null;
+  private options: RpcAgentOptions;
+  private tmpPromptDir: string | null = null;
+  private tmpPromptPath: string | null = null;
+
+  constructor(options: RpcAgentOptions) {
+    this.options = options;
+  }
+
+  start(): void {
+    if (this.proc) return;
+
+    const args: string[] = [
+      "--mode",
+      "rpc",
+      "--session",
+      this.options.sessionFile,
+      "--no-extensions",
+      "--no-skills",
+      "--no-prompt-templates",
+    ];
+
+    if (this.options.model) args.push("--model", this.options.model);
+    if (this.options.tools && this.options.tools.length > 0) args.push("--tools", this.options.tools.join(","));
+
+    if (this.options.systemPrompt.trim()) {
+      const tmp = writePromptToTempFile("agent", this.options.systemPrompt);
+      this.tmpPromptDir = tmp.dir;
+      this.tmpPromptPath = tmp.filePath;
+      args.push("--append-system-prompt", tmp.filePath);
+    }
+
+    this.proc = spawn("pi", args, {
+      cwd: this.options.cwd,
+      shell: false,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    this.proc.stdout.on("data", (data) => this.onData(data.toString()));
+    this.proc.stderr.on("data", (data) => (this.stderr += data.toString()));
+    this.proc.on("close", () => this.handleClose());
+  }
+
+  isRunning(): boolean {
+    return Boolean(this.currentRun);
+  }
+
+  async runPrompt(message: string, options?: RpcRunOptions): Promise<string> {
+    this.start();
+    if (this.currentRun) throw new Error("Agent already running");
+
+    return new Promise<string>((resolve, reject) => {
+      this.currentRun = {
+        resolve,
+        reject,
+        lastAssistantText: "",
+        onUpdate: options?.onUpdate,
+      };
+
+      this.send({ type: "prompt", message });
+    });
+  }
+
+  sendSteer(message: string): void {
+    this.start();
+    const command = this.currentRun
+      ? { type: "prompt", message, streamingBehavior: "steer" }
+      : { type: "prompt", message };
+    this.send(command);
+  }
+
+  abort(): void {
+    if (!this.proc) return;
+    this.send({ type: "abort" });
+  }
+
+  dispose(): void {
+    if (!this.proc) return;
+    this.proc.kill("SIGTERM");
+    this.proc = null;
+    this.cleanupPrompt();
+  }
+
+  private send(payload: Record<string, unknown>): void {
+    if (!this.proc?.stdin) return;
+    this.proc.stdin.write(`${JSON.stringify(payload)}\n`);
+  }
+
+  private onData(chunk: string): void {
+    this.buffer += chunk;
+    const lines = this.buffer.split("\n");
+    this.buffer = lines.pop() || "";
+    for (const line of lines) this.processLine(line);
+  }
+
+  private processLine(line: string): void {
+    if (!line.trim()) return;
+    let event: any;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      return;
+    }
+
+    if (event.type === "message_update" && event.assistantMessageEvent?.type === "text_delta") {
+      this.currentRun?.onUpdate?.({ type: "text_delta", delta: event.assistantMessageEvent.delta ?? "" });
+    }
+
+    if (event.type === "tool_execution_start") {
+      this.currentRun?.onUpdate?.({ type: "tool_start", toolName: event.toolName, args: event.args });
+    }
+
+    if (event.type === "tool_execution_update") {
+      this.currentRun?.onUpdate?.({ type: "tool_update", toolName: event.toolName, partialResult: event.partialResult });
+    }
+
+    if (event.type === "tool_execution_end") {
+      this.currentRun?.onUpdate?.({ type: "tool_end", toolName: event.toolName, isError: event.isError });
+    }
+
+    if (event.type === "message_end" && event.message?.role === "assistant") {
+      const msg = event.message as Message;
+      for (const part of msg.content) {
+        if (part.type === "text") this.currentRun!.lastAssistantText = part.text;
+      }
+    }
+
+    if (event.type === "agent_end") {
+      const run = this.currentRun;
+      if (!run) return;
+      this.currentRun = null;
+      run.resolve(run.lastAssistantText || "");
+    }
+  }
+
+  private handleClose(): void {
+    if (this.currentRun) {
+      this.currentRun.reject(new Error(this.stderr || "RPC agent terminated"));
+      this.currentRun = null;
+    }
+    this.proc = null;
+    this.cleanupPrompt();
+  }
+
+  private cleanupPrompt(): void {
+    if (this.tmpPromptPath)
+      try {
+        fs.unlinkSync(this.tmpPromptPath);
+      } catch {
+        /* ignore */
+      }
+    if (this.tmpPromptDir)
+      try {
+        fs.rmdirSync(this.tmpPromptDir);
+      } catch {
+        /* ignore */
+      }
+    this.tmpPromptPath = null;
+    this.tmpPromptDir = null;
+  }
 }

@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { WorkflowTask, WorkflowWave } from "./config.js";
 
-export type TaskStatus = "pending" | "in_progress" | "verified" | "failed";
+export type TaskStatus = "pending" | "in_progress" | "verified" | "failed" | "stopped";
 
 export interface TaskState extends WorkflowTask {
   status: TaskStatus;
@@ -13,6 +13,8 @@ export interface TaskState extends WorkflowTask {
   lastAgent?: string;
   lastNote?: string;
   lastOutput?: string;
+  sessionFiles?: Record<string, string>;
+  resumeMessage?: string;
 }
 
 export interface WorkflowState {

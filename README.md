@@ -130,6 +130,8 @@ Run `/reload` after changes.
 - `/workflow start <name> [goal]`
 - `/workflow status`
 - `/workflow stop`
+- `/workflow stop-task <id>`
+- `/workflow message <id> <message>`
 - `/workflow help`
 
 ## Notes
@@ -138,6 +140,7 @@ Run `/reload` after changes.
 - The workflow widget includes a `PM: idle/responding...` status line.
 - Subagents run with `--no-extensions --no-skills --no-prompt-templates` to avoid tool noise.
 - Live ticker is UI‑only (not persisted).
+- Tasks can be stopped and messaged via `/workflow stop-task` and `/workflow message` (sessions are persisted per task stage).
 
 ## License
 
