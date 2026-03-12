@@ -17,13 +17,22 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
   const status = `Wave ${state.waveIndex + 1}: ${verified}/${total} verified${failed ? `, ${failed} failed` : ""}`;
   ctx.ui.setStatus("workflow", status);
 
-  const lines = state.tasks.map((task) => {
+  const lines: string[] = [];
+
+  for (const task of state.tasks) {
     const tag = task.status === "verified" ? "✓" : task.status === "failed" ? "✗" : task.status === "in_progress" ? "…" : "•";
     const stage = task.stageId ? ` (${task.stageId})` : "";
     const agent = task.lastAgent ? ` [${task.lastAgent}]` : "";
     const note = task.lastNote ? ` — ${task.lastNote}` : "";
-    return `${tag} ${task.id}: ${task.title}${stage}${agent}${note}`;
-  });
+    lines.push(`${tag} ${task.id}: ${task.title}${stage}${agent}${note}`);
+
+    if (task.lastOutput) {
+      const outputLines = task.lastOutput.split("\n");
+      for (const line of outputLines) {
+        lines.push(`   │ ${line}`);
+      }
+    }
+  }
 
   ctx.ui.setWidget("workflow", [`Workflow: ${state.workflowName}`, ...lines]);
 }

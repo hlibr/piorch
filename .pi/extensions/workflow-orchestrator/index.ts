@@ -144,7 +144,9 @@ async function processTask(
         signal,
       });
       if (result.exitCode !== 0) throw new Error(result.stderr || "Agent failed");
-      output = extractJson(result.outputText || "");
+      const outputText = result.outputText || "";
+      task.lastOutput = outputText;
+      output = extractJson(outputText);
       if (typeof output?.status === "string") {
         task.lastNote = `status: ${output.status}`;
       } else if (typeof output?.summary === "string") {
@@ -155,6 +157,7 @@ async function processTask(
     } catch (error: any) {
       const message = error?.message || "Agent output parse failed";
       task.lastNote = `error: ${message}`;
+      task.lastOutput = message;
       if (stage.id === "verify") {
         task.verifyOutput = { status: "fail", issues: [message] };
         task.issues = [message];
