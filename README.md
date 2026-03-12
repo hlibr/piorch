@@ -144,6 +144,14 @@ Run `/reload` after changes.
 - Tasks can be stopped and messaged via `/workflow stop-task` and `/workflow message` (sessions are persisted per task stage).
 - Use `/workflow expand` to show more tasks in the widget, `/workflow collapse` to revert.
 
+## Known Issues
+
+- Reload/restart loses control of running tasks: `/workflow stop`, `/workflow stop-task`, and `/workflow message` can’t reach in-flight subagents after `/reload` or restart; state is restored but runners aren’t.
+- No true resume after restart: workflow loop doesn’t resume; “in progress” tasks don’t advance unless manually restarted.
+- PM has no long-term memory: each PM response is a fresh run using the current state summary only.
+- PM chat routing can swallow normal chat: while a workflow is active, user input is always routed to PM with no toggle back.
+- UI can show stale “in progress” status after reload (no live updates).
+
 ## TODO
 
 - Better UI (colors)
