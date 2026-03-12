@@ -199,7 +199,7 @@ async function processTask(
     task.status = "in_progress";
     task.stageId = stage.id;
     task.lastAgent = stage.agent;
-    task.lastNote = "status: running";
+    task.lastNote = "running";
     setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
 
     const agentName = stage.agent;
@@ -246,7 +246,7 @@ async function processTask(
       const outputText = result.outputText || "";
       output = extractJson(outputText);
       if (typeof output?.status === "string") {
-        task.lastNote = `status: ${output.status}`;
+        task.lastNote = String(output.status);
       } else if (typeof output?.summary === "string") {
         task.lastNote = output.summary.slice(0, 80);
       } else {
@@ -295,7 +295,7 @@ async function processTask(
     if (stage.id === "verify") {
       const status = output?.status ? String(output.status) : "unknown";
       const issues = Array.isArray(output?.issues) ? output.issues.join("; ") : "";
-      const summary = issues ? `status: ${status}\nissues: ${issues}` : `status: ${status}`;
+      const summary = issues ? `${status}\nissues: ${issues}` : status;
       sendAgentSummary(pi, task, stage.id, summary);
     }
 
