@@ -22,6 +22,7 @@ This plan describes how to resume a workflow after a crash or restart, **without
 ## 1) Persist additional orchestration state
 
 ### Data to persist in `WorkflowState`
+
 Add fields so the scheduler can be reconstructed:
 
 - `runId` (already present)
@@ -36,6 +37,7 @@ Add fields so the scheduler can be reconstructed:
   - `resumeAttempted: boolean`
 
 ### Per-task additions (`TaskState`)
+
 - **New** `lastStartedAt?: number`
 - **New** `resumeCount?: number`
 - **New** `lastRunStageId?: string`
@@ -53,6 +55,7 @@ We do **not** attempt to kill or reconnect to orphaned subagent processes. We re
 ## 3) New resume flow
 
 ### New command
+
 - `/workflow resume [--auto]`
   - Restores state from session entries.
   - Rebuilds the workflow loop **from the current wave index**.
@@ -60,6 +63,7 @@ We do **not** attempt to kill or reconnect to orphaned subagent processes. We re
   - Replays any tasks marked `stopped` only if the user explicitly chooses.
 
 ### Auto-resume option
+
 - On `session_start`, if `resumeInfo.wasRunning === true`, prompt:
   - “Previous workflow was interrupted. Resume?”
 
@@ -81,6 +85,7 @@ Rebuild a resume scheduler that mirrors `startWorkflow()`:
 - Stop when max waves are reached or PM returns `done`.
 
 ### Optional
+
 Add `/workflow resume-all` to restart **pending + in_progress** tasks.
 
 ---
@@ -107,6 +112,7 @@ Each task already has `sessionFiles[stageId]`. Ensure:
 - On new run after failure, **continue** appending to the same file (keeps full context).
 
 If file is missing:
+
 - Recreate it and warn the user that context was lost.
 
 ---
@@ -114,10 +120,12 @@ If file is missing:
 ## 7) UI updates
 
 ### Widget status lines
+
 - Display `resumed` or `restarted` in ticker/notes.
 - Show `resumeCount` if > 1.
 
 ### Task list
+
 - Add a visual indicator (e.g. `↻` or `R`) for resumed tasks.
 
 ---
