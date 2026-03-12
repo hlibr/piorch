@@ -1,5 +1,4 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
 import type { WorkflowState } from "./state.js";
 
 let pmWidgetStatus: string | undefined;
@@ -9,11 +8,6 @@ export function setPmWidgetStatus(text?: string) {
 }
 
 function shorten(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 1)}…`;
-}
-
-function truncateLine(text: string, max: number): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max - 1)}…`;
 }
@@ -41,36 +35,30 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
     return aOrder - bOrder;
   });
 
-  ctx.ui.setWidget("workflow", (tui, theme) => {
-    const maxWidth = Math.max(40, tui.width - 4);
-    const maxLines = 6;
-    const lines: string[] = [];
+  const theme = ctx.ui.theme;
+  const maxWidth = 50;
+  const maxTasks = 2;
+  const lines: string[] = [];
 
-    lines.push(theme.fg("toolTitle", truncateLine(`Workflow: ${state.workflowName}`, maxWidth)));
-    lines.push(theme.fg("accent", truncateLine(`PM: ${pmWidgetStatus ?? "idle"}`, maxWidth)));
+  lines.push(theme.fg("toolTitle", shorten(`Workflow: ${state.workflowName}`, maxWidth)));
+  lines.push(theme.fg("accent", shorten(`PM: ${pmWidgetStatus ?? "idle"}`, maxWidth)));
 
-    for (const task of sortedTasks) {
-      if (lines.length + 1 > maxLines) break;
-      const tag = task.status === "verified" ? "✓" : task.status === "failed" ? "✗" : task.status === "in_progress" ? "…" : "•";
-      const stage = task.stageId ? ` (${task.stageId})` : "";
-      const agent = task.lastAgent ? ` [${task.lastAgent}]` : "";
-      const note = task.lastNote ? ` — ${task.lastNote}` : "";
-      const title = shorten(task.title, 60);
-      const mainLine = truncateLine(`${tag} ${task.id}: ${title}${stage}${agent}${note}`, maxWidth);
-      lines.push(theme.fg("toolOutput", mainLine));
+  const visibleTasks = sortedTasks.slice(0, maxTasks);
+  for (const task of visibleTasks) {
+    const tag = task.status === "verified" ? "✓" : task.status === "failed" ? "✗" : task.status === "in_progress" ? "…" : "•";
+    const stage = task.stageId ? ` (${task.stageId})` : "";
+    const agent = task.lastAgent ? ` [${task.lastAgent}]` : "";
+    const note = task.lastNote ? ` — ${task.lastNote}` : "";
+    const title = shorten(task.title, maxWidth);
+    lines.push(theme.fg("toolOutput", shorten(`${tag} ${task.id}: ${title}${stage}${agent}${note}`, maxWidth)));
 
-      if (task.status === "in_progress" && task.lastOutput && lines.length + 1 <= maxLines) {
-        const tickerLine = truncateLine(`   ↳ ${task.lastOutput}`, maxWidth);
-        lines.push(theme.fg("dim", tickerLine));
-      }
+    if (task.status === "in_progress" && task.lastOutput) {
+      lines.push(theme.fg("dim", shorten(`↳ ${task.lastOutput}`, maxWidth)));
     }
+  }
 
-    if (lines.length < maxLines && sortedTasks.length > 0) {
-      const shownTasks = Math.max(0, lines.length - 2);
-      const remaining = Math.max(0, sortedTasks.length - shownTasks);
-      if (remaining > 0) lines.push(theme.fg("muted", `… +${remaining} more`));
-    }
+  const remaining = Math.max(0, sortedTasks.length - visibleTasks.length);
+  if (remaining > 0) lines.push(theme.fg("muted", `… +${remaining} more`));
 
-    return new Text(lines.join("\n"), 0, 0);
-  });
+  ctx.ui.setWidget("workflow", lines);
 }
