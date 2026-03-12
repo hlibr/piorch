@@ -33,7 +33,7 @@
       {
         "id": "verify",
         "agent": "verifier",
-        "inputTemplate": "Verify task {{task.title}}. Dev summary: {{task.dev.summary}}",
+        "inputTemplate": "Verify task {{task.title}}.\nDescription: {{task.description}}\nDev summary: {{task.dev.summary}}",
         "outputSchema": {
           "status": "pass|fail",
           "issues": "string[]"
