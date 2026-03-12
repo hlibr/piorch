@@ -155,7 +155,6 @@ Run `/reload` after changes.
 - User message routing to PM can swallow chat: no toggle to return to normal chat
 - No explicit resume command: stop+message works, but /workflow resume T1 would be clearer
 - No UI indicator for stopped tasks beyond ⏸ (e.g., “stopped by user”)
-- PM control via tools is implemented, but PM prompt doesn’t mention them (so it won’t use them unless instructed)
 
 ## License
 
