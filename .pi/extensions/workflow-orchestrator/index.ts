@@ -99,6 +99,19 @@ function sendPmMessage(pi: ExtensionAPI, text: string) {
   });
 }
 
+function setPmStatus(ctx: ExtensionContext, text?: string) {
+  if (!ctx.hasUI) return;
+  ctx.ui.setStatus("workflow-pm", text);
+}
+
+function sendWorkflowNotice(pi: ExtensionAPI, text: string) {
+  pi.sendMessage({
+    customType: PM_MESSAGE_TYPE,
+    content: text,
+    display: true,
+  });
+}
+
 function buildWaveSummary(state: WorkflowState): string {
   const lines = state.tasks.map((task) => {
     const status = task.status === "verified" ? "verified" : task.status === "failed" ? "failed" : task.status;
@@ -337,6 +350,7 @@ async function runPmAgent(
   if (!pmAgent) throw new Error(`PM agent not found: ${config.agents.pm}`);
   if (pmBusy) throw new Error("PM is already running");
   pmBusy = true;
+  setPmStatus(ctx, "PM: responding...");
   try {
     const result = await runAgent({
       name: pmAgent.name,
@@ -351,6 +365,7 @@ async function runPmAgent(
     return result.outputText || "";
   } finally {
     pmBusy = false;
+    setPmStatus(ctx, undefined);
   }
 }
 
@@ -408,6 +423,7 @@ async function startWorkflow(
         updatedAt: Date.now(),
       };
       setState(pi, ctx, initialState);
+      sendWorkflowNotice(pi, `Workflow started: ${effectiveConfig.goal}`);
 
       let previousSummary = "";
 
@@ -450,9 +466,11 @@ async function startWorkflow(
         updatedAt: Date.now(),
       };
       setState(pi, ctx, finalState);
+      sendWorkflowNotice(pi, "Workflow completed.");
       if (ctx.hasUI) ctx.ui.notify("Workflow completed", "info");
     } catch (error: any) {
       const message = error?.message || "Workflow failed";
+      sendWorkflowNotice(pi, `Workflow error: ${message}`);
       if (ctx.hasUI) ctx.ui.notify(message, "error");
       if (currentState) {
         setState(pi, ctx, { ...currentState, active: false, updatedAt: Date.now() });
@@ -476,6 +494,7 @@ function stopWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext): void {
     currentState.active = false;
     setState(pi, ctx, currentState);
   }
+  sendWorkflowNotice(pi, "Workflow stopped.");
   if (ctx.hasUI) ctx.ui.notify("Workflow stopped", "info");
 }
 
@@ -483,6 +502,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     currentState = restoreState(ctx);
     if (currentState) updateStatus(ctx, currentState);
+    setPmStatus(ctx, undefined);
   });
 
   pi.on("input", async (event, ctx) => {
@@ -515,6 +535,21 @@ export default function (pi: ExtensionAPI) {
       const command = tokens[0];
       const name = tokens[1];
       const goalText = normalizeGoal(tokens.slice(2).join(" "));
+
+      if (!command || command === "help") {
+        sendWorkflowNotice(
+          pi,
+          [
+            "Workflow commands:",
+            "  /workflow start <name> [goal]",
+            "  /workflow status",
+            "  /workflow stop",
+            "Example:",
+            "  /workflow start default \"Build a Telegram bot\"",
+          ].join("\n"),
+        );
+        return;
+      }
 
       if (command === "start") {
         if (!name) {
