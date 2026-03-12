@@ -96,6 +96,17 @@ function sendPmMessage(pi: ExtensionAPI, text: string) {
   });
 }
 
+function sendAgentSummary(pi: ExtensionAPI, task: TaskState, stageId: string, summary: string) {
+  const agent = task.lastAgent ?? "agent";
+  const title = task.title;
+  const message = `${agent} (${stageId}) finished ${task.id}: ${title}\n${summary}`;
+  pi.sendMessage({
+    customType: PM_MESSAGE_TYPE,
+    content: message,
+    display: true,
+  });
+}
+
 function setPmStatus(ctx: ExtensionContext, text?: string) {
   if (!ctx.hasUI) return;
   ctx.ui.setStatus("workflow-pm", text);
@@ -275,6 +286,18 @@ async function processTask(
 
     if (stage.id === "develop") task.devOutput = output;
     if (stage.id === "verify") task.verifyOutput = output;
+
+    if (stage.id === "develop") {
+      const summary = typeof output?.summary === "string" ? output.summary : JSON.stringify(output);
+      sendAgentSummary(pi, task, stage.id, summary);
+    }
+
+    if (stage.id === "verify") {
+      const status = output?.status ? String(output.status) : "unknown";
+      const issues = Array.isArray(output?.issues) ? output.issues.join("; ") : "";
+      const summary = issues ? `status: ${status}\nissues: ${issues}` : `status: ${status}`;
+      sendAgentSummary(pi, task, stage.id, summary);
+    }
 
     let nextStageId: string | undefined;
     if (stage.transitions && stage.transitions.length > 0) {
