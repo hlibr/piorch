@@ -144,7 +144,7 @@ Run `/reload` after changes.
 
 - Reload/restart stops running tasks and marks the workflow inactive; there’s no automatic resume.
 - No true resume after restart: workflow loop doesn’t resume; “in progress” tasks don’t advance unless manually restarted.
-- PM memory is only per workflow run: it persists within a run, but is not restored after restart/reload.
+- PM memory persists across runs for the same workflow name; it does not reset unless you delete the PM session file.
 - PM chat routing can swallow normal chat: while a workflow is active, user input is always routed to PM with no toggle back.
 
 ## TODO
@@ -153,7 +153,6 @@ Run `/reload` after changes.
 - Fix user messages not appearing in chat
 - Expand tasks
 - Add integration tests for RPC runner and end-to-end flows
-- Persist PM memory across messages (session-based PM context)
 - Implement workflow reload/resume after restart (/reload or pi exit)
 - User message routing to PM can swallow chat: no toggle to return to normal chat
 - No explicit resume command: stop+message works, but /workflow resume T1 would be clearer

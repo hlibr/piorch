@@ -207,10 +207,15 @@ function ensureSessionFile(state: WorkflowState, task: TaskState, stageId: strin
   return task.sessionFiles[stageId]!;
 }
 
+function slugify(value: string): string {
+  return value.replace(/[^\w.-]+/g, "_");
+}
+
 function ensurePmSessionFile(state: WorkflowState): string {
-  const workflowDir = path.join(".pi", "workflows", "sessions", state.runId);
+  const workflowDir = path.join(".pi", "workflows", "sessions");
   fs.mkdirSync(workflowDir, { recursive: true });
-  return path.join(workflowDir, "pm.jsonl");
+  const name = slugify(state.workflowName || "default");
+  return path.join(workflowDir, `pm-${name}.jsonl`);
 }
 
 function getRunnerKey(taskId: string, stageId: string): string {
