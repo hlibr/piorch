@@ -49,6 +49,16 @@ function extractJson(text: string): any {
   return JSON.parse(jsonText);
 }
 
+function normalizeGoal(goal?: string): string | undefined {
+  if (!goal) return undefined;
+  const trimmed = goal.trim();
+  if (!trimmed) return undefined;
+  if ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
 async function mapWithConcurrencyLimit<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>): Promise<void> {
   if (items.length === 0) return;
   const limit = Math.max(1, Math.min(concurrency, items.length));
@@ -101,6 +111,8 @@ async function processTask(
 
     task.status = "in_progress";
     task.stageId = stage.id;
+    task.lastAgent = stage.agent;
+    task.lastNote = `running ${stage.id}`;
     setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
 
     const agentName = stage.agent;
@@ -133,8 +145,16 @@ async function processTask(
       });
       if (result.exitCode !== 0) throw new Error(result.stderr || "Agent failed");
       output = extractJson(result.outputText || "");
+      if (typeof output?.status === "string") {
+        task.lastNote = `status: ${output.status}`;
+      } else if (typeof output?.summary === "string") {
+        task.lastNote = output.summary.slice(0, 80);
+      } else {
+        task.lastNote = "completed";
+      }
     } catch (error: any) {
       const message = error?.message || "Agent output parse failed";
+      task.lastNote = `error: ${message}`;
       if (stage.id === "verify") {
         task.verifyOutput = { status: "fail", issues: [message] };
         task.issues = [message];
@@ -265,7 +285,12 @@ async function generateWaveFromPm(
   return { done: false, wave: output.wave as WorkflowWave };
 }
 
-async function startWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext, workflowName: string): Promise<void> {
+async function startWorkflow(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+  workflowName: string,
+  goalOverride?: string,
+): Promise<void> {
   if (currentRun) {
     if (ctx.hasUI) ctx.ui.notify("Workflow already running", "warning");
     return;
@@ -273,14 +298,18 @@ async function startWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext, wor
 
   const { config } = loadWorkflowConfig(ctx.cwd, workflowName);
   const { agents } = discoverAgents(ctx.cwd);
+  const effectiveConfig: WorkflowConfig = {
+    ...config,
+    goal: goalOverride ?? config.goal,
+  };
 
   const abortController = new AbortController();
   const runPromise = (async () => {
     try {
       const initialState: WorkflowState = {
         runId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        workflowName: config.name,
-        goal: config.goal,
+        workflowName: effectiveConfig.name,
+        goal: effectiveConfig.goal,
         active: true,
         waveIndex: 0,
         tasks: [],
@@ -290,17 +319,17 @@ async function startWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext, wor
 
       let previousSummary = "";
 
-      for (let waveIndex = 0; waveIndex < (config.maxWaves ?? 10); waveIndex++) {
+      for (let waveIndex = 0; waveIndex < (effectiveConfig.maxWaves ?? 10); waveIndex++) {
         if (abortController.signal.aborted) throw new Error("Workflow aborted");
 
         let wave: WorkflowWave | undefined;
-        if (config.waveSource.type === "static") {
-          wave = config.waveSource.staticWaves?.[waveIndex];
+        if (effectiveConfig.waveSource.type === "static") {
+          wave = effectiveConfig.waveSource.staticWaves?.[waveIndex];
           if (!wave) {
             break;
           }
         } else {
-          const pmResult = await generateWaveFromPm(config, agents, ctx, abortController.signal, previousSummary);
+          const pmResult = await generateWaveFromPm(effectiveConfig, agents, ctx, abortController.signal, previousSummary);
           if (pmResult.done) {
             break;
           }
@@ -318,7 +347,7 @@ async function startWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext, wor
         };
         setState(pi, ctx, updatedState);
 
-        await runWave(pi, ctx, config, wave, agents, abortController.signal);
+        await runWave(pi, ctx, effectiveConfig, wave, agents, abortController.signal);
 
         previousSummary = buildWaveSummary(currentState!);
       }
@@ -367,13 +396,17 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("workflow", {
     description: "Manage workflow orchestrator",
     handler: async (args, ctx) => {
-      const [command, name] = (args || "").split(/\s+/).filter(Boolean);
+      const tokens = (args || "").split(/\s+/).filter(Boolean);
+      const command = tokens[0];
+      const name = tokens[1];
+      const goalText = normalizeGoal(tokens.slice(2).join(" "));
+
       if (command === "start") {
         if (!name) {
-          ctx.ui?.notify("Usage: /workflow start <name>", "warning");
+          ctx.ui?.notify("Usage: /workflow start <name> [goal]", "warning");
           return;
         }
-        void startWorkflow(pi, ctx, name);
+        void startWorkflow(pi, ctx, name, goalText);
         return;
       }
 
@@ -398,12 +431,15 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "workflow_run",
     label: "Workflow Run",
-    description: "Start a workflow by name.",
+    description: "Start a workflow by name (optional goal override).",
     parameters: Type.Object({
       name: Type.String({ description: "Workflow name" }),
+      goal: Type.Optional(Type.String({ description: "Optional goal override" })),
     }),
     async execute(_toolCallId, params) {
-      pi.sendUserMessage(`/workflow start ${params.name}`, { deliverAs: "followUp" });
+      const goal = normalizeGoal(params.goal);
+      const command = goal ? `/workflow start ${params.name} "${goal}"` : `/workflow start ${params.name}`;
+      pi.sendUserMessage(command, { deliverAs: "followUp" });
       return { content: [{ type: "text", text: `Queued workflow start: ${params.name}` }] };
     },
   });

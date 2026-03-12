@@ -10,6 +10,8 @@ export interface TaskState extends WorkflowTask {
   issues?: string[];
   devOutput?: Record<string, unknown>;
   verifyOutput?: Record<string, unknown>;
+  lastAgent?: string;
+  lastNote?: string;
 }
 
 export interface WorkflowState {
