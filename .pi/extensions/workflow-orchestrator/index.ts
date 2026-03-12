@@ -658,6 +658,22 @@ export default function (pi: ExtensionAPI) {
     taskRunners.clear();
   });
 
+  pi.on("session_shutdown", async (_event, ctx) => {
+    if (currentRun) {
+      currentRun.abortController.abort();
+      currentRun = null;
+    }
+    for (const runner of taskRunners.values()) {
+      runner.agent.abort();
+      runner.agent.dispose();
+    }
+    taskRunners.clear();
+    if (currentState?.active) {
+      currentState.active = false;
+      setState(pi, ctx, currentState);
+    }
+  });
+
   pi.on("input", async (event, ctx) => {
     if (!currentState?.active) return { action: "continue" };
     if (event.source === "extension") return { action: "continue" };
