@@ -49,8 +49,8 @@ The extension is auto‑discovered from `.pi/extensions/workflow-orchestrator`.
 ```
 
 You’ll see:
-- A widget above the editor with live per‑task status
-- PM responses in the main chat
+- A widget above the editor with live per‑task status and a PM line
+- PM responses in the main chat (summarized wave output, not raw JSON)
 
 Stop with:
 
@@ -133,6 +133,8 @@ Run `/reload` after changes.
 
 ## Notes
 
+- PM wave output is summarized in chat (task titles + wave goal), not raw JSON.
+- The workflow widget includes a `PM: idle/responding...` status line.
 - Subagents run with `--no-extensions --no-skills --no-prompt-templates` to avoid tool noise.
 - Live ticker is UI‑only (not persisted).
 
