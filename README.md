@@ -143,8 +143,6 @@ Run `/reload` after changes.
 
 ## Known Issues
 
-- Reload/restart stops running tasks and marks the workflow inactive; resume requires `/workflow resume`.
-- Tasks do not auto-restart after a crash; use `/workflow resume` to continue.
 - PM memory persists across runs for the same workflow name; it does not reset unless you delete the PM session file.
 - PM chat routing can swallow normal chat: while a workflow is active, user input is always routed to PM with no toggle back.
 
