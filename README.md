@@ -77,6 +77,7 @@ Edit `.pi/workflows/default.workflow.json` to customize:
 - stages and transitions
 - wave source (PM or static)
 - retries and parallelism
+- allowedExtensions (whitelist extensions for subagents)
 
 ### Agents
 

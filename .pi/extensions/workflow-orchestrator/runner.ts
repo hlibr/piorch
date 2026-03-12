@@ -19,6 +19,7 @@ export interface AgentRunInput {
   tools?: string[];
   signal?: AbortSignal;
   onUpdate?: (update: AgentRunUpdate) => void;
+  allowedExtensions?: string[];
 }
 
 export interface AgentRunResult {
@@ -34,6 +35,7 @@ export interface RpcAgentOptions {
   systemPrompt: string;
   model?: string;
   tools?: string[];
+  allowedExtensions?: string[];
 }
 
 export interface RpcRunOptions {
@@ -77,6 +79,11 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     "--no-skills",
     "--no-prompt-templates",
   ];
+  if (input.allowedExtensions) {
+    for (const ext of input.allowedExtensions) {
+      args.push("-e", ext);
+    }
+  }
   if (input.model) args.push("--model", input.model);
   if (input.tools && input.tools.length > 0) args.push("--tools", input.tools.join(","));
 
@@ -212,6 +219,12 @@ export class RpcAgent {
       "--no-skills",
       "--no-prompt-templates",
     ];
+
+    if (this.options.allowedExtensions) {
+      for (const ext of this.options.allowedExtensions) {
+        args.push("-e", ext);
+      }
+    }
 
     if (this.options.model) args.push("--model", this.options.model);
     if (this.options.tools && this.options.tools.length > 0) args.push("--tools", this.options.tools.join(","));

@@ -4,6 +4,7 @@
   "maxWaves": 10,
   "maxTaskRetries": 3,
   "parallelism": 2,
+  "allowedExtensions": [],
   "agents": {
     "pm": "pm",
     "developer": "developer",

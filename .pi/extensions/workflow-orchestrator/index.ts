@@ -217,6 +217,7 @@ function getTaskRunner(
     systemPrompt: agent.systemPrompt,
     model: agent.model,
     tools: agent.tools,
+    allowedExtensions: currentState.allowedExtensions,
   });
 
   const taskRunner: TaskRunner = { key, agent: runner, stageId: stage.id };
@@ -474,6 +475,7 @@ async function runPmAgent(
       model: pmAgent.model,
       tools: pmAgent.tools,
       signal,
+      allowedExtensions: currentState?.allowedExtensions,
     });
     if (result.exitCode !== 0) throw new Error(result.stderr || "PM agent failed");
     return result.outputText || "";
@@ -539,6 +541,7 @@ async function startWorkflow(
         waveIndex: 0,
         tasks: [],
         updatedAt: Date.now(),
+        allowedExtensions: effectiveConfig.allowedExtensions,
       };
       setState(pi, ctx, initialState);
       sendWorkflowNotice(pi, `Workflow started: ${effectiveConfig.goal}`);
