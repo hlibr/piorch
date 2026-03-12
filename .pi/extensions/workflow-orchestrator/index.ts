@@ -188,7 +188,6 @@ async function processTask(
     task.status = "in_progress";
     task.stageId = stage.id;
     task.lastAgent = stage.agent;
-    task.lastNote = `running ${stage.id}`;
     setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
 
     const agentName = stage.agent;
