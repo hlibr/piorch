@@ -5,6 +5,7 @@ import { Type } from "@sinclair/typebox";
 import { Text } from "@mariozechner/pi-tui";
 import { discoverAgents, findAgentByName } from "./agents.js";
 import { loadWorkflowConfig, type WorkflowConfig, type WorkflowStage, type WorkflowTask, type WorkflowWave } from "./config.js";
+import { runTaskFlow } from "./engine.js";
 import { setPmWidgetStatus, setTaskListExpanded, updateStatus } from "./render.js";
 import { RpcAgent, runAgent } from "./runner.js";
 import { appendState, restoreState, type TaskState, type WorkflowState } from "./state.js";
@@ -285,150 +286,117 @@ async function processTask(
   startStageId?: string,
 ): Promise<void> {
   const stages = config.taskFlow.stages;
-  let currentStageId = startStageId ?? stages[0]?.id;
 
-  while (currentStageId) {
-    if (signal.aborted) throw new Error("Workflow aborted");
-    if (task.status === "stopped") return;
+  await runTaskFlow<TaskState, { output: any; outputText: string }>({
+    task,
+    stages,
+    maxRetries: config.maxTaskRetries ?? 2,
+    isStopped: (t) => t.status === "stopped" || signal.aborted,
+    onStageStart: (stage, t) => {
+      t.status = "in_progress";
+      t.stageId = stage.id;
+      t.lastAgent = stage.agent;
+      t.lastNote = "running";
+      setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
+    },
+    runStage: async (stage, t) => {
+      const templateData = {
+        task: {
+          ...t,
+          dev: t.devOutput,
+          verify: t.verifyOutput,
+          issues: t.issues,
+        },
+        workflow: { goal: config.goal },
+        wave: { goal: wave.goal, index: currentState?.waveIndex ?? 0 },
+      };
 
-    const stage = findStageById(stages, currentStageId);
-    if (!stage) throw new Error(`Stage not found: ${currentStageId}`);
+      let taskPrompt = renderTemplate(stage.inputTemplate, templateData as Record<string, unknown>);
+      if (t.resumeMessage) {
+        taskPrompt = `${taskPrompt}\n\nAdditional instruction:\n${t.resumeMessage}`;
+        t.resumeMessage = undefined;
+      }
 
-    task.status = "in_progress";
-    task.stageId = stage.id;
-    task.lastAgent = stage.agent;
-    task.lastNote = "running";
-    setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
-
-    const agentName = stage.agent;
-    const templateData = {
-      task: {
-        ...task,
-        dev: task.devOutput,
-        verify: task.verifyOutput,
-        issues: task.issues,
-      },
-      workflow: { goal: config.goal },
-      wave: { goal: wave.goal, index: currentState?.waveIndex ?? 0 },
-    };
-
-    let taskPrompt = renderTemplate(stage.inputTemplate, templateData as Record<string, unknown>);
-    if (task.resumeMessage) {
-      taskPrompt = `${taskPrompt}\n\nAdditional instruction:\n${task.resumeMessage}`;
-      task.resumeMessage = undefined;
-    }
-
-    let output: any;
-    try {
-      const runner = getTaskRunner(ctx, task, stage, agentName, agents);
+      const runner = getTaskRunner(ctx, t, stage, stage.agent, agents);
       const outputText = await runner.agent.runPrompt(taskPrompt, {
         onUpdate: (update) => {
           if (!currentState) return;
           if (update.type === "text_delta") {
-            appendOutput(task, update.delta, "delta");
+            appendOutput(t, update.delta, "delta");
             setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] }, false);
             return;
           }
           if (update.type === "tool_start") {
-            appendOutput(task, `tool ${update.toolName}`, "line");
+            appendOutput(t, `tool ${update.toolName}`, "line");
             setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] }, false);
           }
         },
       });
 
-      if (task.status === "stopped") return;
+      const output = extractJson(outputText);
+      return { output, outputText };
+    },
+    applyOutput: (t, stageId, result) => {
+      const output = result.output;
+      if (stageId === "develop") t.devOutput = output;
+      if (stageId === "verify") t.verifyOutput = output;
 
-      output = extractJson(outputText);
       if (typeof output?.status === "string") {
-        task.lastNote = String(output.status);
+        t.lastNote = String(output.status);
       } else if (typeof output?.summary === "string") {
-        task.lastNote = output.summary.slice(0, 80);
+        t.lastNote = output.summary.slice(0, 80);
       } else {
-        task.lastNote = "completed";
-      }
-      const tickerSource = typeof output?.summary === "string" ? output.summary : outputText.split("\n")[0] ?? "";
-      task.lastOutput = truncateTicker(tickerSource.trim());
-    } catch (error: any) {
-      if (task.status === "stopped") return;
-      const message = error?.message || "Agent output parse failed";
-      task.lastNote = `error: ${message}`;
-      task.lastOutput = truncateTicker(message);
-      if (stage.id === "verify") {
-        task.verifyOutput = { status: "fail", issues: [message] };
-        task.issues = [message];
-        task.retries += 1;
-        if (task.retries > config.maxTaskRetries) {
-          task.status = "failed";
-          task.stageId = stage.id;
-          setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
-          return;
-        }
-        currentStageId = config.taskFlow.stages[0]?.id;
-        setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
-        continue;
+        t.lastNote = "completed";
       }
 
-      task.issues = [message];
-      task.retries += 1;
-      if (task.retries > config.maxTaskRetries) {
-        task.status = "failed";
-        setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
-        return;
+      const tickerSource = typeof output?.summary === "string" ? output.summary : result.outputText.split("\n")[0] ?? "";
+      t.lastOutput = truncateTicker(tickerSource.trim());
+
+      if (stageId === "develop") {
+        const summary = typeof output?.summary === "string" ? output.summary : JSON.stringify(output);
+        sendAgentSummary(pi, t, stageId, summary);
       }
+      if (stageId === "verify") {
+        const status = output?.status ? String(output.status) : "unknown";
+        const issues = Array.isArray(output?.issues) ? output.issues.join("; ") : "";
+        const summary = issues ? `${status}\nissues: ${issues}` : status;
+        sendAgentSummary(pi, t, stageId, summary);
+      }
+
       setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
-      continue;
-    }
-
-    if (stage.id === "develop") task.devOutput = output;
-    if (stage.id === "verify") task.verifyOutput = output;
-
-    if (stage.id === "develop") {
-      const summary = typeof output?.summary === "string" ? output.summary : JSON.stringify(output);
-      sendAgentSummary(pi, task, stage.id, summary);
-    }
-
-    if (stage.id === "verify") {
-      const status = output?.status ? String(output.status) : "unknown";
-      const issues = Array.isArray(output?.issues) ? output.issues.join("; ") : "";
-      const summary = issues ? `${status}\nissues: ${issues}` : status;
-      sendAgentSummary(pi, task, stage.id, summary);
-    }
-
-    let nextStageId: string | undefined;
-    if (stage.transitions && stage.transitions.length > 0) {
-      for (const transition of stage.transitions) {
-        const fieldValue = getByPath(output, transition.when.field);
-        if (String(fieldValue) === transition.when.equals) {
-          nextStageId = transition.next;
-          break;
-        }
-      }
-    } else {
-      nextStageId = getNextStageId(stages, stage.id);
-    }
-
-    if (!nextStageId || nextStageId === "complete") {
-      task.status = "verified";
-      task.stageId = stage.id;
+    },
+    applyVerifyFailure: (t, _stageId, result, errorMessage) => {
+      const output = result?.output;
+      const issues = output?.issues ?? (errorMessage ? [errorMessage] : []);
+      t.verifyOutput = { status: "fail", issues };
+      t.issues = Array.isArray(issues) ? issues.map(String) : [String(issues)];
+      t.retries += 1;
+      t.lastNote = errorMessage ? `error: ${errorMessage}` : "fail";
+      if (errorMessage) t.lastOutput = truncateTicker(errorMessage);
       setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
-      return;
-    }
-
-    if (nextStageId === stages[0]?.id && stage.id === "verify") {
-      const issues = output?.issues;
-      task.issues = Array.isArray(issues) ? issues.map(String) : ["Verification failed"];
-      task.retries += 1;
-      if (task.retries > config.maxTaskRetries) {
-        task.status = "failed";
-        task.stageId = stage.id;
-        setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
-        return;
-      }
-    }
-
-    currentStageId = nextStageId;
-    setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
-  }
+      return t.retries <= (config.maxTaskRetries ?? 2);
+    },
+    applyGenericFailure: (t, errorMessage) => {
+      t.issues = [errorMessage];
+      t.retries += 1;
+      t.lastNote = `error: ${errorMessage}`;
+      t.lastOutput = truncateTicker(errorMessage);
+      setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
+      return t.retries <= (config.maxTaskRetries ?? 2);
+    },
+    markVerified: (t, stageId) => {
+      t.status = "verified";
+      t.stageId = stageId;
+      setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
+    },
+    markFailed: (t, stageId) => {
+      t.status = "failed";
+      t.stageId = stageId;
+      setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
+    },
+    getField: getByPath,
+    getNextStageId: (stagesList, stageId) => getNextStageId(stagesList as WorkflowStage[], stageId),
+  });
 }
 
 async function runWave(
