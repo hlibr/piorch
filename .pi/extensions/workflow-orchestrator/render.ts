@@ -1,4 +1,5 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { Text } from "@mariozechner/pi-tui";
 import type { WorkflowState } from "./state.js";
 
 let pmWidgetStatus: string | undefined;
@@ -70,6 +71,6 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
       if (remaining > 0) lines.push(theme.fg("muted", `… +${remaining} more`));
     }
 
-    return lines;
+    return new Text(lines.join("\n"), 0, 0);
   });
 }
