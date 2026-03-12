@@ -961,6 +961,10 @@ export default function (pi: ExtensionAPI) {
           ctx.ui?.notify("Usage: /workflow start <name> [goal]", "warning");
           return;
         }
+        if (currentState && !currentState.active) {
+          ctx.ui?.notify("Existing workflow state found. Use /workflow resume.", "warning");
+          return;
+        }
         void startWorkflow(pi, ctx, name, goalText);
         return;
       }

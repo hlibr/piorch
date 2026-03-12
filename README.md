@@ -124,7 +124,7 @@ Run `/reload` after changes.
 ## Commands
 
 - `/workflow start <name> [goal]`
-- `/workflow resume`
+- `/workflow resume` (continue from saved state)
 - `/workflow status`
 - `/workflow stop`
 - `/workflow stop-task <id>`
