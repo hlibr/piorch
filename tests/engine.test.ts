@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { runTaskFlow, type StageDefinition } from "../.pi/extensions/workflow-orchestrator/engine.js";
+import {
+  runTaskFlow,
+  type StageDefinition,
+} from "../.pi/extensions/workflow-orchestrator/engine.js";
 
 interface TestTask {
   id: string;
@@ -80,7 +83,8 @@ describe("runTaskFlow", () => {
       runStage: async (stage) => {
         if (stage.id === "develop") return { output: { status: "done" }, outputText: "dev" };
         verifyCount += 1;
-        if (verifyCount === 1) return { output: { status: "fail", issues: ["bug"] }, outputText: "verify" };
+        if (verifyCount === 1)
+          return { output: { status: "fail", issues: ["bug"] }, outputText: "verify" };
         return { output: { status: "pass", issues: [] }, outputText: "verify" };
       },
     });

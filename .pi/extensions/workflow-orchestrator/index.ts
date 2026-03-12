@@ -1,10 +1,20 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+  ExtensionContext,
+} from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { Text } from "@mariozechner/pi-tui";
 import { discoverAgents, findAgentByName } from "./agents.js";
-import { loadWorkflowConfig, type WorkflowConfig, type WorkflowStage, type WorkflowTask, type WorkflowWave } from "./config.js";
+import {
+  loadWorkflowConfig,
+  type WorkflowConfig,
+  type WorkflowStage,
+  type WorkflowTask,
+  type WorkflowWave,
+} from "./config.js";
 import { runTaskFlow } from "./engine.js";
 import { setPmWidgetStatus, setTaskListExpanded, updateStatus } from "./render.js";
 import { RpcAgent, runAgent } from "./runner.js";
@@ -67,7 +77,10 @@ function normalizeGoal(goal?: string): string | undefined {
   if (!goal) return undefined;
   const trimmed = goal.trim();
   if (!trimmed) return undefined;
-  if ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
     return trimmed.slice(1, -1).trim();
   }
   return trimmed;
@@ -133,7 +146,8 @@ function sendWorkflowNotice(pi: ExtensionAPI, text: string) {
 
 function buildWaveSummary(state: WorkflowState): string {
   const lines = state.tasks.map((task) => {
-    const status = task.status === "verified" ? "verified" : task.status === "failed" ? "failed" : task.status;
+    const status =
+      task.status === "verified" ? "verified" : task.status === "failed" ? "failed" : task.status;
     return `${task.id}: ${task.title} (${status})`;
   });
   return lines.join("\n");
@@ -156,7 +170,11 @@ function buildPmChatPrompt(state: WorkflowState, message: string): string {
   ].join("\n\n");
 }
 
-async function mapWithConcurrencyLimit<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>): Promise<void> {
+async function mapWithConcurrencyLimit<T>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
   if (items.length === 0) return;
   const limit = Math.max(1, Math.min(concurrency, items.length));
   let nextIndex = 0;
@@ -269,7 +287,16 @@ async function messageTask(
   task.lastNote = "running";
   task.status = "in_progress";
   setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
-  void processTask(pi, ctx, config, task, currentState.wave, agents, new AbortController().signal, task.stageId);
+  void processTask(
+    pi,
+    ctx,
+    config,
+    task,
+    currentState.wave,
+    agents,
+    new AbortController().signal,
+    task.stageId,
+  );
 }
 
 function findStageById(stages: WorkflowStage[], id: string): WorkflowStage | undefined {
@@ -321,7 +348,10 @@ async function processTask(
         wave: { goal: wave.goal, index: currentState?.waveIndex ?? 0 },
       };
 
-      let taskPrompt = renderTemplate(workflowStage.inputTemplate, templateData as Record<string, unknown>);
+      let taskPrompt = renderTemplate(
+        workflowStage.inputTemplate,
+        templateData as Record<string, unknown>,
+      );
       if (t.resumeMessage) {
         taskPrompt = `${taskPrompt}\n\nAdditional instruction:\n${t.resumeMessage}`;
         t.resumeMessage = undefined;
@@ -359,11 +389,15 @@ async function processTask(
         t.lastNote = "completed";
       }
 
-      const tickerSource = typeof output?.summary === "string" ? output.summary : result.outputText.split("\n")[0] ?? "";
+      const tickerSource =
+        typeof output?.summary === "string"
+          ? output.summary
+          : (result.outputText.split("\n")[0] ?? "");
       t.lastOutput = truncateTicker(tickerSource.trim());
 
       if (stageId === "develop") {
-        const summary = typeof output?.summary === "string" ? output.summary : JSON.stringify(output);
+        const summary =
+          typeof output?.summary === "string" ? output.summary : JSON.stringify(output);
         sendAgentSummary(pi, t, stageId, summary);
       }
       if (stageId === "verify") {
@@ -543,7 +577,14 @@ async function startWorkflow(
             break;
           }
         } else {
-          const pmResult = await generateWaveFromPm(pi, effectiveConfig, agents, ctx, abortController.signal, previousSummary);
+          const pmResult = await generateWaveFromPm(
+            pi,
+            effectiveConfig,
+            agents,
+            ctx,
+            abortController.signal,
+            previousSummary,
+          );
           if (pmResult.done) {
             break;
           }
@@ -631,7 +672,14 @@ export default function (pi: ExtensionAPI) {
       const { agents } = discoverAgents(ctx.cwd);
       const effectiveConfig: WorkflowConfig = { ...config, goal: currentState.goal };
       const prompt = buildPmChatPrompt(currentState, event.text);
-      const outputText = await runPmAgent(pi, effectiveConfig, agents, ctx, new AbortController().signal, prompt);
+      const outputText = await runPmAgent(
+        pi,
+        effectiveConfig,
+        agents,
+        ctx,
+        new AbortController().signal,
+        prompt,
+      );
       sendPmMessage(pi, outputText);
       return { action: "handled" };
     } catch (error: any) {
@@ -661,7 +709,7 @@ export default function (pi: ExtensionAPI) {
             "  /workflow expand",
             "  /workflow collapse",
             "Example:",
-            "  /workflow start default \"Build a Telegram bot\"",
+            '  /workflow start default "Build a Telegram bot"',
           ].join("\n"),
         );
         return;
@@ -746,12 +794,16 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      ctx.ui?.notify("Usage: /workflow start|status|stop|stop-task|message|expand|collapse", "warning");
+      ctx.ui?.notify(
+        "Usage: /workflow start|status|stop|stop-task|message|expand|collapse",
+        "warning",
+      );
     },
   });
 
   pi.registerMessageRenderer(PM_MESSAGE_TYPE, (message, _options, theme) => {
-    const text = theme.fg("toolTitle", theme.bold("PM")) + theme.fg("muted", ": ") + message.content;
+    const text =
+      theme.fg("toolTitle", theme.bold("PM")) + theme.fg("muted", ": ") + message.content;
     return new Text(text, 0, 0);
   });
 
@@ -765,9 +817,14 @@ export default function (pi: ExtensionAPI) {
     }),
     async execute(_toolCallId, params) {
       const goal = normalizeGoal(params.goal);
-      const command = goal ? `/workflow start ${params.name} "${goal}"` : `/workflow start ${params.name}`;
+      const command = goal
+        ? `/workflow start ${params.name} "${goal}"`
+        : `/workflow start ${params.name}`;
       pi.sendUserMessage(command, { deliverAs: "followUp" });
-      return { content: [{ type: "text", text: `Queued workflow start: ${params.name}` }], details: {} };
+      return {
+        content: [{ type: "text", text: `Queued workflow start: ${params.name}` }],
+        details: {},
+      };
     },
   });
 
@@ -779,9 +836,11 @@ export default function (pi: ExtensionAPI) {
       id: Type.String({ description: "Task id" }),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      if (!currentState) return { content: [{ type: "text", text: "No workflow state." }], details: {} };
+      if (!currentState)
+        return { content: [{ type: "text", text: "No workflow state." }], details: {} };
       const task = findTask(params.id);
-      if (!task) return { content: [{ type: "text", text: `Task not found: ${params.id}` }], details: {} };
+      if (!task)
+        return { content: [{ type: "text", text: `Task not found: ${params.id}` }], details: {} };
       stopTask(task);
       setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
       return { content: [{ type: "text", text: `Stopped task ${params.id}` }], details: {} };
@@ -797,13 +856,18 @@ export default function (pi: ExtensionAPI) {
       message: Type.String({ description: "Message to send" }),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      if (!currentState) return { content: [{ type: "text", text: "No workflow state." }], details: {} };
+      if (!currentState)
+        return { content: [{ type: "text", text: "No workflow state." }], details: {} };
       const task = findTask(params.id);
-      if (!task) return { content: [{ type: "text", text: `Task not found: ${params.id}` }], details: {} };
+      if (!task)
+        return { content: [{ type: "text", text: `Task not found: ${params.id}` }], details: {} };
       const { config } = loadWorkflowConfig(ctx.cwd, currentState.workflowName);
       const { agents } = discoverAgents(ctx.cwd);
       await messageTask(pi, ctx, config, task, params.message, agents);
-      return { content: [{ type: "text", text: `Sent message to task ${params.id}` }], details: {} };
+      return {
+        content: [{ type: "text", text: `Sent message to task ${params.id}` }],
+        details: {},
+      };
     },
   });
 }

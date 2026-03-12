@@ -23,7 +23,12 @@ export interface TaskFlowInput<TTask, TOutput> {
   markVerified: (task: TTask, stageId: string) => void;
   markFailed: (task: TTask, stageId: string) => void;
   applyOutput: (task: TTask, stageId: string, output: TOutput) => void;
-  applyVerifyFailure: (task: TTask, stageId: string, output: TOutput | null, error?: string) => boolean;
+  applyVerifyFailure: (
+    task: TTask,
+    stageId: string,
+    output: TOutput | null,
+    error?: string,
+  ) => boolean;
   applyGenericFailure: (task: TTask, error: string) => boolean;
 }
 
@@ -43,7 +48,9 @@ function defaultGetNextStageId(stages: StageDefinition[], stageId: string): stri
   return stages[index + 1]?.id;
 }
 
-export async function runTaskFlow<TTask extends { retries: number }, TOutput>(input: TaskFlowInput<TTask, TOutput>) {
+export async function runTaskFlow<TTask extends { retries: number }, TOutput>(
+  input: TaskFlowInput<TTask, TOutput>,
+) {
   const getField = input.getField ?? defaultGetField;
   const getNextStageId = input.getNextStageId ?? defaultGetNextStageId;
   let currentStageId = input.startStageId ?? input.stages[0]?.id;

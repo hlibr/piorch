@@ -32,7 +32,7 @@ Create the following files:
 
 ---
 
-## 2. Agent Definitions (.pi/agents/*.md)
+## 2. Agent Definitions (.pi/agents/\*.md)
 
 Use the same frontmatter format as the subagent example (see `examples/extensions/subagent/agents.ts`). Each file must include `name` and `description` in frontmatter, and the body becomes the system prompt for the agent.
 
@@ -45,16 +45,17 @@ description: Product manager who plans and delegates tasks in waves.
 model: anthropic/claude-sonnet-4-5
 tools: read,grep,find,ls
 ---
+
 You are a PM. Given the project goal and the last wave’s results, produce the next wave of tasks.
 Return JSON only in this shape:
 {
-  "wave": {
-    "goal": "...",
-    "tasks": [
-      {"id": "T1", "title": "...", "description": "...", "assignee": "developer"}
-    ]
-  },
-  "done": false
+"wave": {
+"goal": "...",
+"tasks": [
+{"id": "T1", "title": "...", "description": "...", "assignee": "developer"}
+]
+},
+"done": false
 }
 If everything is complete, return {"done": true}.
 ```
@@ -68,12 +69,13 @@ description: Implements assigned tasks.
 model: anthropic/claude-sonnet-4-5
 tools: read,edit,write,bash,grep,find,ls
 ---
+
 You are a developer. Implement the task in the repo. When done, respond with JSON only:
 {
-  "status": "done",
-  "summary": "...",
-  "filesChanged": ["path", "path"],
-  "notes": "..."
+"status": "done",
+"summary": "...",
+"filesChanged": ["path", "path"],
+"notes": "..."
 }
 ```
 
@@ -86,10 +88,11 @@ description: Reviews developer work and validates requirements.
 model: anthropic/claude-sonnet-4-5
 tools: read,grep,find,ls,bash
 ---
+
 You are a verifier. Review the task deliverables and repo state. Return JSON only:
 {
-  "status": "pass" | "fail",
-  "issues": ["..."]
+"status": "pass" | "fail",
+"issues": ["..."]
 }
 ```
 

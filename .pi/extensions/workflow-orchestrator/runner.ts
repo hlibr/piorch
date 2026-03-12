@@ -49,7 +49,10 @@ interface RpcRunState {
   onUpdate?: (update: AgentRunUpdate) => void;
 }
 
-function writePromptToTempFile(agentName: string, prompt: string): { dir: string; filePath: string } {
+function writePromptToTempFile(
+  agentName: string,
+  prompt: string,
+): { dir: string; filePath: string } {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-workflow-"));
   const safeName = agentName.replace(/[^\w.-]+/g, "_");
   const filePath = path.join(tmpDir, `prompt-${safeName}.md`);
@@ -129,7 +132,11 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
       }
 
       if (event.type === "tool_execution_update") {
-        input.onUpdate?.({ type: "tool_update", toolName: event.toolName, partialResult: event.partialResult });
+        input.onUpdate?.({
+          type: "tool_update",
+          toolName: event.toolName,
+          partialResult: event.partialResult,
+        });
       }
 
       if (event.type === "tool_execution_end") {
@@ -227,7 +234,8 @@ export class RpcAgent {
     }
 
     if (this.options.model) args.push("--model", this.options.model);
-    if (this.options.tools && this.options.tools.length > 0) args.push("--tools", this.options.tools.join(","));
+    if (this.options.tools && this.options.tools.length > 0)
+      args.push("--tools", this.options.tools.join(","));
 
     if (this.options.systemPrompt.trim()) {
       const tmp = writePromptToTempFile("agent", this.options.systemPrompt);
@@ -309,19 +317,34 @@ export class RpcAgent {
     }
 
     if (event.type === "message_update" && event.assistantMessageEvent?.type === "text_delta") {
-      this.currentRun?.onUpdate?.({ type: "text_delta", delta: event.assistantMessageEvent.delta ?? "" });
+      this.currentRun?.onUpdate?.({
+        type: "text_delta",
+        delta: event.assistantMessageEvent.delta ?? "",
+      });
     }
 
     if (event.type === "tool_execution_start") {
-      this.currentRun?.onUpdate?.({ type: "tool_start", toolName: event.toolName, args: event.args });
+      this.currentRun?.onUpdate?.({
+        type: "tool_start",
+        toolName: event.toolName,
+        args: event.args,
+      });
     }
 
     if (event.type === "tool_execution_update") {
-      this.currentRun?.onUpdate?.({ type: "tool_update", toolName: event.toolName, partialResult: event.partialResult });
+      this.currentRun?.onUpdate?.({
+        type: "tool_update",
+        toolName: event.toolName,
+        partialResult: event.partialResult,
+      });
     }
 
     if (event.type === "tool_execution_end") {
-      this.currentRun?.onUpdate?.({ type: "tool_end", toolName: event.toolName, isError: event.isError });
+      this.currentRun?.onUpdate?.({
+        type: "tool_end",
+        toolName: event.toolName,
+        isError: event.isError,
+      });
     }
 
     if (event.type === "message_end" && event.message?.role === "assistant") {

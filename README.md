@@ -49,6 +49,7 @@ The extension is auto‑discovered from `.pi/extensions/workflow-orchestrator`.
 ```
 
 You’ll see:
+
 - A widget above the editor with live per‑task status and a PM line
 - Active tasks show an indented ticker line with recent tool/text updates
 - PM responses in the main chat (summarized wave output, not raw JSON)
@@ -73,6 +74,7 @@ PM: <message>
 ### Workflow config
 
 Edit `.pi/workflows/default.workflow.json` to customize:
+
 - agent names
 - stages and transitions
 - wave source (PM or static)
@@ -98,17 +100,13 @@ Create `~/.pi/agent/models.json`:
       "baseUrl": "https://openrouter.ai/api/v1",
       "apiKey": "REPLACE_WITH_OPENROUTER_KEY",
       "api": "openai-completions",
-      "models": [
-        { "id": "openrouter/hunter-alpha", "name": "OpenRouter Hunter Alpha" }
-      ]
+      "models": [{ "id": "openrouter/hunter-alpha", "name": "OpenRouter Hunter Alpha" }]
     },
     "local-llm": {
       "baseUrl": "http://127.0.0.1:1234/v1",
       "apiKey": "local",
       "api": "openai-completions",
-      "models": [
-        { "id": "local-model", "name": "Local LLM" }
-      ]
+      "models": [{ "id": "local-model", "name": "Local LLM" }]
     }
   }
 }

@@ -1,9 +1,11 @@
 # Project Guide (Pi Workflow Orchestrator)
 
 ## Purpose
+
 This repo contains a **pi extension** that orchestrates PM → Dev → Verifier workflows with waves of tasks, live UI status, and subagent runs. The extension lives under `.pi/extensions/workflow-orchestrator/`.
 
 ## How to run
+
 From repo root:
 
 ```bash
@@ -17,6 +19,7 @@ Then:
 ```
 
 Reload extensions:
+
 ```
 /reload
 ```

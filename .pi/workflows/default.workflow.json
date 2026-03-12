@@ -35,8 +35,8 @@
           "issues": "string[]"
         },
         "transitions": [
-          {"when": {"field": "status", "equals": "fail"}, "next": "develop"},
-          {"when": {"field": "status", "equals": "pass"}, "next": "complete"}
+          { "when": { "field": "status", "equals": "fail" }, "next": "develop" },
+          { "when": { "field": "status", "equals": "pass" }, "next": "complete" }
         ]
       }
     ]

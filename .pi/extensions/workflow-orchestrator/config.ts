@@ -79,7 +79,9 @@ export function loadWorkflowConfig(cwd: string, name: string): LoadedWorkflow {
   }
 
   if (!Value.Check(WorkflowSchema, parsed)) {
-    const errors = [...Value.Errors(WorkflowSchema, parsed)].map((err) => `${err.path} ${err.message}`);
+    const errors = [...Value.Errors(WorkflowSchema, parsed)].map(
+      (err) => `${err.path} ${err.message}`,
+    );
     throw new Error(`Workflow schema validation failed:\n${errors.join("\n")}`);
   }
 
