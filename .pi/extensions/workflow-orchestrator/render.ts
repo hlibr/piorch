@@ -43,6 +43,7 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
 
   ctx.ui.setWidget("workflow", (tui, theme) => {
     const maxWidth = Math.max(40, tui.width - 4);
+    const maxLines = Math.max(6, Math.min(14, tui.height - 6));
     const lines: string[] = [];
 
     lines.push(theme.fg("toolTitle", truncateLine(`Workflow: ${state.workflowName}`, maxWidth)));
@@ -57,10 +58,17 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
       const mainLine = truncateLine(`${tag} ${task.id}: ${title}${stage}${agent}${note}`, maxWidth);
       lines.push(theme.fg("toolOutput", mainLine));
 
-      if (task.lastOutput) {
+      if (task.status === "in_progress" && task.lastOutput) {
         const tickerLine = truncateLine(`   ↳ ${task.lastOutput}`, maxWidth);
         lines.push(theme.fg("dim", tickerLine));
       }
+
+      if (lines.length >= maxLines) break;
+    }
+
+    if (lines.length >= maxLines && sortedTasks.length > 0) {
+      const remaining = Math.max(0, sortedTasks.length - Math.floor((lines.length - 2) / 2));
+      if (remaining > 0) lines.push(theme.fg("muted", `… +${remaining} more`));
     }
 
     return new Text(lines.join("\n"), 0, 0);
