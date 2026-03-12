@@ -291,6 +291,7 @@ async function processTask(
     task,
     stages,
     maxRetries: config.maxTaskRetries ?? 2,
+    startStageId: startStageId,
     isStopped: (t) => t.status === "stopped" || signal.aborted,
     onStageStart: (stage, t) => {
       const workflowStage = stage as WorkflowStage;

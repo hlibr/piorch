@@ -12,6 +12,7 @@ export interface TaskFlowInput<TTask, TOutput> {
   task: TTask;
   stages: StageDefinition[];
   maxRetries: number;
+  startStageId?: string;
   runStage: (stage: StageDefinition, task: TTask) => Promise<TOutput>;
   onStageStart?: (stage: StageDefinition, task: TTask) => void;
   onStageEnd?: (stage: StageDefinition, task: TTask, output: TOutput) => void;
@@ -45,7 +46,7 @@ function defaultGetNextStageId(stages: StageDefinition[], stageId: string): stri
 export async function runTaskFlow<TTask extends { retries: number }, TOutput>(input: TaskFlowInput<TTask, TOutput>) {
   const getField = input.getField ?? defaultGetField;
   const getNextStageId = input.getNextStageId ?? defaultGetNextStageId;
-  let currentStageId = input.stages[0]?.id;
+  let currentStageId = input.startStageId ?? input.stages[0]?.id;
 
   while (currentStageId) {
     if (input.isStopped?.(input.task)) return;
@@ -86,8 +87,9 @@ export async function runTaskFlow<TTask extends { retries: number }, TOutput>(in
 
     let nextStageId: string | undefined;
     if (stage.transitions && stage.transitions.length > 0) {
+      const fieldTarget = (output as any)?.output ?? output;
       for (const transition of stage.transitions) {
-        const fieldValue = getField(output as any, transition.when.field);
+        const fieldValue = getField(fieldTarget as any, transition.when.field);
         if (String(fieldValue) === transition.when.equals) {
           nextStageId = transition.next;
           break;
@@ -102,7 +104,8 @@ export async function runTaskFlow<TTask extends { retries: number }, TOutput>(in
       return;
     }
 
-    if (nextStageId === input.stages[0]?.id && stage.id === "verify") {
+    const firstStageId = input.startStageId ?? input.stages[0]?.id;
+    if (nextStageId === firstStageId && stage.id === "verify") {
       const retry = input.applyVerifyFailure(input.task, stage.id, output);
       if (!retry) {
         input.markFailed(input.task, stage.id);
