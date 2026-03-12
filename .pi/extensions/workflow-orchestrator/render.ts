@@ -1,4 +1,5 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { Text } from "@mariozechner/pi-tui";
 import type { WorkflowState } from "./state.js";
 
 let pmWidgetStatus: string | undefined;
@@ -8,6 +9,11 @@ export function setPmWidgetStatus(text?: string) {
 }
 
 function shorten(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1)}…`;
+}
+
+function truncateLine(text: string, max: number): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max - 1)}…`;
 }
@@ -35,17 +41,28 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
     return aOrder - bOrder;
   });
 
-  const lines: string[] = [`PM: ${pmWidgetStatus ?? "idle"}`];
+  ctx.ui.setWidget("workflow", (tui, theme) => {
+    const maxWidth = Math.max(40, tui.width - 4);
+    const lines: string[] = [];
 
-  for (const task of sortedTasks) {
-    const tag = task.status === "verified" ? "✓" : task.status === "failed" ? "✗" : task.status === "in_progress" ? "…" : "•";
-    const stage = task.stageId ? ` (${task.stageId})` : "";
-    const agent = task.lastAgent ? ` [${task.lastAgent}]` : "";
-    const note = task.lastNote ? ` — ${task.lastNote}` : "";
-    const ticker = task.lastOutput ? ` | ${task.lastOutput}` : "";
-    const title = shorten(task.title, 60);
-    lines.push(`${tag} ${task.id}: ${title}${stage}${agent}${note}${ticker}`);
-  }
+    lines.push(theme.fg("toolTitle", truncateLine(`Workflow: ${state.workflowName}`, maxWidth)));
+    lines.push(theme.fg("accent", truncateLine(`PM: ${pmWidgetStatus ?? "idle"}`, maxWidth)));
 
-  ctx.ui.setWidget("workflow", [`Workflow: ${state.workflowName}`, ...lines]);
+    for (const task of sortedTasks) {
+      const tag = task.status === "verified" ? "✓" : task.status === "failed" ? "✗" : task.status === "in_progress" ? "…" : "•";
+      const stage = task.stageId ? ` (${task.stageId})` : "";
+      const agent = task.lastAgent ? ` [${task.lastAgent}]` : "";
+      const note = task.lastNote ? ` — ${task.lastNote}` : "";
+      const title = shorten(task.title, 60);
+      const mainLine = truncateLine(`${tag} ${task.id}: ${title}${stage}${agent}${note}`, maxWidth);
+      lines.push(theme.fg("toolOutput", mainLine));
+
+      if (task.lastOutput) {
+        const tickerLine = truncateLine(`   ↳ ${task.lastOutput}`, maxWidth);
+        lines.push(theme.fg("dim", tickerLine));
+      }
+    }
+
+    return new Text(lines.join("\n"), 0, 0);
+  });
 }
