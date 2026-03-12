@@ -132,6 +132,8 @@ Run `/reload` after changes.
 - `/workflow stop`
 - `/workflow stop-task <id>`
 - `/workflow message <id> <message>`
+- `/workflow expand`
+- `/workflow collapse`
 - `/workflow help`
 
 ## Notes
@@ -141,6 +143,7 @@ Run `/reload` after changes.
 - Subagents run with `--no-extensions --no-skills --no-prompt-templates` to avoid tool noise.
 - Live ticker is UI‑only (not persisted).
 - Tasks can be stopped and messaged via `/workflow stop-task` and `/workflow message` (sessions are persisted per task stage).
+- Use `/workflow expand` to show more tasks in the widget, `/workflow collapse` to revert.
 
 ## TODO
 

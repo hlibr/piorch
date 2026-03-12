@@ -2,9 +2,14 @@ import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { WorkflowState } from "./state.js";
 
 let pmWidgetStatus: string | undefined;
+let taskListExpanded = false;
 
 export function setPmWidgetStatus(text?: string) {
   pmWidgetStatus = text;
+}
+
+export function setTaskListExpanded(expanded: boolean) {
+  taskListExpanded = expanded;
 }
 
 function shorten(text: string, max: number): string {
@@ -37,13 +42,15 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
 
   const theme = ctx.ui.theme;
   const maxWidth = 80;
-  const maxTasks = 4;
+  const maxTasks = taskListExpanded ? 10 : 4;
+  const maxTickerLines = taskListExpanded ? 1 : 2;
   const lines: string[] = [];
 
   lines.push(theme.fg("toolTitle", shorten(`Workflow: ${state.workflowName}`, maxWidth)));
   lines.push(theme.fg("accent", shorten(`PM: ${pmWidgetStatus ?? "idle"}`, maxWidth)));
 
   const visibleTasks = sortedTasks.slice(0, maxTasks);
+  let tickerShown = 0;
   for (const task of visibleTasks) {
     const tag =
       task.status === "verified"
@@ -63,13 +70,17 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
     const title = shorten(task.title, remainingWidth);
     lines.push(theme.fg("toolOutput", shorten(`${header}: ${title}${note}`, maxWidth)));
 
-    if (task.status === "in_progress" && task.lastOutput) {
+    if (task.status === "in_progress" && task.lastOutput && tickerShown < maxTickerLines) {
       lines.push(theme.fg("dim", shorten(`↳ ${task.lastOutput}`, maxWidth)));
+      tickerShown += 1;
     }
   }
 
   const remaining = Math.max(0, sortedTasks.length - visibleTasks.length);
-  if (remaining > 0) lines.push(theme.fg("muted", `… +${remaining} more`));
+  if (remaining > 0) {
+    const hint = taskListExpanded ? "" : " (use /workflow expand)";
+    lines.push(theme.fg("muted", `… +${remaining} more${hint}`));
+  }
 
   ctx.ui.setWidget("workflow", lines);
 }

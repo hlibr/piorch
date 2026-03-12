@@ -5,7 +5,7 @@ import { Type } from "@sinclair/typebox";
 import { Text } from "@mariozechner/pi-tui";
 import { discoverAgents, findAgentByName } from "./agents.js";
 import { loadWorkflowConfig, type WorkflowConfig, type WorkflowStage, type WorkflowTask, type WorkflowWave } from "./config.js";
-import { setPmWidgetStatus, updateStatus } from "./render.js";
+import { setPmWidgetStatus, setTaskListExpanded, updateStatus } from "./render.js";
 import { RpcAgent, runAgent } from "./runner.js";
 import { appendState, restoreState, type TaskState, type WorkflowState } from "./state.js";
 
@@ -666,6 +666,8 @@ export default function (pi: ExtensionAPI) {
             "  /workflow stop",
             "  /workflow stop-task <id>",
             "  /workflow message <id> <message>",
+            "  /workflow expand",
+            "  /workflow collapse",
             "Example:",
             "  /workflow start default \"Build a Telegram bot\"",
           ].join("\n"),
@@ -740,7 +742,19 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      ctx.ui?.notify("Usage: /workflow start|status|stop|stop-task|message", "warning");
+      if (command === "expand") {
+        setTaskListExpanded(true);
+        if (currentState) updateStatus(ctx, currentState);
+        return;
+      }
+
+      if (command === "collapse") {
+        setTaskListExpanded(false);
+        if (currentState) updateStatus(ctx, currentState);
+        return;
+      }
+
+      ctx.ui?.notify("Usage: /workflow start|status|stop|stop-task|message|expand|collapse", "warning");
     },
   });
 
