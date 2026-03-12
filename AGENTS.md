@@ -61,8 +61,17 @@ To apply changes safely:
 
 ## Allowed extensions for subagents
 
-Use `allowedExtensions` in workflow JSON to whitelist extensions for subagents:
+Use `allowedExtensions` in workflow JSON to whitelist extensions for all subagents, or
+use `allowedExtensionsByAgent` to set per-agent allowlists:
 
 ```json
 "allowedExtensions": ["/absolute/path/to/ext.ts"]
+```
+
+```json
+"allowedExtensionsByAgent": {
+  "pm": ["/absolute/path/to/ext.ts"],
+  "developer": [],
+  "verifier": []
+}
 ```

@@ -218,6 +218,32 @@ function ensurePmSessionFile(state: WorkflowState): string {
   return path.join(workflowDir, `pm-${name}.jsonl`);
 }
 
+function resolveAllowedExtensions(
+  agentName: string,
+  config: WorkflowConfig,
+  state?: WorkflowState,
+): string[] | undefined {
+  const role =
+    agentName === config.agents.pm
+      ? "pm"
+      : agentName === config.agents.developer
+        ? "developer"
+        : agentName === config.agents.verifier
+          ? "verifier"
+          : undefined;
+
+  if (role) {
+    return (
+      state?.allowedExtensionsByAgent?.[role] ??
+      config.allowedExtensionsByAgent?.[role] ??
+      state?.allowedExtensions ??
+      config.allowedExtensions
+    );
+  }
+
+  return state?.allowedExtensions ?? config.allowedExtensions;
+}
+
 function getRunnerKey(taskId: string, stageId: string): string {
   return `${taskId}:${stageId}`;
 }
@@ -228,6 +254,7 @@ function findTask(taskId: string): TaskState | undefined {
 
 function getTaskRunner(
   ctx: ExtensionContext,
+  config: WorkflowConfig,
   task: TaskState,
   stage: WorkflowStage,
   agentName: string,
@@ -248,7 +275,7 @@ function getTaskRunner(
     systemPrompt: agent.systemPrompt,
     model: agent.model,
     tools: agent.tools,
-    allowedExtensions: currentState.allowedExtensions,
+    allowedExtensions: resolveAllowedExtensions(agentName, config, currentState),
   });
 
   const taskRunner: TaskRunner = { key, agent: runner, stageId: stage.id };
@@ -369,7 +396,7 @@ async function processTask(
         t.resumeMessage = undefined;
       }
 
-      const runner = getTaskRunner(ctx, t, workflowStage, workflowStage.agent, agents);
+      const runner = getTaskRunner(ctx, config, t, workflowStage, workflowStage.agent, agents);
       const outputText = await runner.agent.runPrompt(taskPrompt, {
         onUpdate: (update) => {
           if (!currentState) return;
@@ -528,7 +555,7 @@ function getPmRunner(
     systemPrompt: pmAgent.systemPrompt,
     model: pmAgent.model,
     tools: pmAgent.tools,
-    allowedExtensions: currentState.allowedExtensions,
+    allowedExtensions: resolveAllowedExtensions(pmAgent.name, config, currentState),
   });
   return pmRunner;
 }
@@ -730,6 +757,7 @@ async function startWorkflow(
         tasks: [],
         updatedAt: Date.now(),
         allowedExtensions: effectiveConfig.allowedExtensions,
+        allowedExtensionsByAgent: effectiveConfig.allowedExtensionsByAgent,
         previousSummary: "",
         waveSummaries: [],
       };

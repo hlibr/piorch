@@ -36,6 +36,14 @@ const WaveSourceSchema = Type.Object({
   staticWaves: Type.Optional(Type.Array(WaveSchema)),
 });
 
+const AllowedExtensionsByAgentSchema = Type.Partial(
+  Type.Object({
+    pm: Type.Array(Type.String()),
+    developer: Type.Array(Type.String()),
+    verifier: Type.Array(Type.String()),
+  }),
+);
+
 const WorkflowSchema = Type.Object({
   name: Type.String(),
   goal: Type.String(),
@@ -43,6 +51,7 @@ const WorkflowSchema = Type.Object({
   maxTaskRetries: Type.Optional(Type.Number()),
   parallelism: Type.Optional(Type.Number()),
   allowedExtensions: Type.Optional(Type.Array(Type.String())),
+  allowedExtensionsByAgent: Type.Optional(AllowedExtensionsByAgentSchema),
   agents: Type.Object({
     pm: Type.String(),
     developer: Type.String(),

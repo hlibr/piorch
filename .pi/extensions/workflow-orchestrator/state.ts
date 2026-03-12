@@ -27,6 +27,11 @@ export interface WorkflowState {
   tasks: TaskState[];
   updatedAt: number;
   allowedExtensions?: string[];
+  allowedExtensionsByAgent?: {
+    pm?: string[];
+    developer?: string[];
+    verifier?: string[];
+  };
   previousSummary?: string;
   waveSummaries?: string[];
 }
