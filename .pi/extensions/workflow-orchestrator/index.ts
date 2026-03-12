@@ -668,8 +668,14 @@ export default function (pi: ExtensionAPI) {
       runner.agent.dispose();
     }
     taskRunners.clear();
-    if (currentState?.active) {
+    if (currentState) {
       currentState.active = false;
+      currentState.tasks = currentState.tasks.map((task) => {
+        if (task.status === "in_progress") {
+          return { ...task, status: "stopped", lastNote: "stopped" };
+        }
+        return task;
+      });
       setState(pi, ctx, currentState);
     }
   });
