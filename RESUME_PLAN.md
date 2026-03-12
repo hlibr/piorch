@@ -44,19 +44,9 @@ Purpose: show “resumed” in UI, track repeated resumes, and avoid infinite lo
 
 ---
 
-## 2) Optional orphan cleanup (best-effort)
+## 2) Orphan handling (no PID killing)
 
-This is optional. If you **only** rely on `session_shutdown`, the common case (parent process exit) will terminate child processes. After a crash, however, orphaned subagent processes are possible.
-
-### Optional add to `TaskState`
-- `runnerPid?: number`
-- `runnerStartedAt?: number`
-
-### Optional behavior
-- Capture `child.pid` and write it into task state.
-- Provide a `/workflow abort-orphans` command to try to terminate old PIDs.
-
-> Caveat: PIDs can be reused. Only attempt this if you can verify the process command line is a `pi --mode rpc` subagent.
+We do **not** attempt to kill or reconnect to orphaned subagent processes. We rely on `session_shutdown` for graceful cleanup in normal exits. After a crash, orphaned processes are possible but rare, and we accept that risk to avoid killing unrelated processes.
 
 ---
 
@@ -188,4 +178,3 @@ On `session_start`:
 - [ ] PM session file support
 - [ ] UI changes for resumed tasks
 - [ ] Documentation update (README)
-- [ ] (Optional) Orphan cleanup command + PID tracking
