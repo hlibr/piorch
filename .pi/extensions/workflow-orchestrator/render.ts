@@ -43,13 +43,14 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
 
   ctx.ui.setWidget("workflow", (tui, theme) => {
     const maxWidth = Math.max(40, tui.width - 4);
-    const maxLines = Math.max(6, Math.min(14, tui.height - 6));
+    const maxLines = Math.max(3, tui.height - 4);
     const lines: string[] = [];
 
     lines.push(theme.fg("toolTitle", truncateLine(`Workflow: ${state.workflowName}`, maxWidth)));
     lines.push(theme.fg("accent", truncateLine(`PM: ${pmWidgetStatus ?? "idle"}`, maxWidth)));
 
     for (const task of sortedTasks) {
+      if (lines.length + 1 > maxLines) break;
       const tag = task.status === "verified" ? "✓" : task.status === "failed" ? "✗" : task.status === "in_progress" ? "…" : "•";
       const stage = task.stageId ? ` (${task.stageId})` : "";
       const agent = task.lastAgent ? ` [${task.lastAgent}]` : "";
@@ -58,16 +59,14 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
       const mainLine = truncateLine(`${tag} ${task.id}: ${title}${stage}${agent}${note}`, maxWidth);
       lines.push(theme.fg("toolOutput", mainLine));
 
-      if (task.status === "in_progress" && task.lastOutput) {
+      if (task.status === "in_progress" && task.lastOutput && lines.length + 1 <= maxLines) {
         const tickerLine = truncateLine(`   ↳ ${task.lastOutput}`, maxWidth);
         lines.push(theme.fg("dim", tickerLine));
       }
-
-      if (lines.length >= maxLines) break;
     }
 
-    if (lines.length >= maxLines && sortedTasks.length > 0) {
-      const remaining = Math.max(0, sortedTasks.length - Math.floor((lines.length - 2) / 2));
+    if (lines.length < maxLines && sortedTasks.length > 0) {
+      const remaining = Math.max(0, sortedTasks.length - Math.max(0, lines.length - 2));
       if (remaining > 0) lines.push(theme.fg("muted", `… +${remaining} more`));
     }
 
