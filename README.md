@@ -151,6 +151,7 @@ Run `/reload` after changes.
 - Better UI (colors)
 - Fix user messages not appearing in chat
 - Expand tasks
+- Add integration tests for RPC runner and end-to-end flows
 
 ## License
 
