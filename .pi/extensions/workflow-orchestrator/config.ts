@@ -74,7 +74,7 @@ export function loadWorkflowConfig(cwd: string, name: string): LoadedWorkflow {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
-  } catch (error) {
+  } catch (_error) {
     throw new Error(`Invalid JSON in workflow file: ${workflowPath}`);
   }
 

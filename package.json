@@ -12,11 +12,16 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@mariozechner/pi-ai": "^0.57.1",
+    "@mariozechner/pi-coding-agent": "^0.57.1",
+    "@mariozechner/pi-tui": "^0.57.1",
+    "@sinclair/typebox": "^0.34.48",
     "@types/node": "^25.5.0",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
     "eslint": "^9.9.0",
     "eslint-config-prettier": "^9.1.0",
+    "globals": "^17.4.0",
     "markdownlint-cli": "^0.42.0",
     "prettier": "^3.3.3",
     "typescript": "^5.6.2",
