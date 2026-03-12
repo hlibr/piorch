@@ -250,10 +250,17 @@ async function messageTask(
   const key = getRunnerKey(task.id, task.stageId);
   const runner = taskRunners.get(key);
   if (runner) {
-    runner.agent.sendSteer(message);
     task.lastNote = "running";
     task.status = "in_progress";
     setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
+    if (runner.agent.isRunning()) {
+      runner.agent.sendSteer(message);
+      return;
+    }
+    const taskPrompt = `${message}`;
+    void runner.agent.runPrompt(taskPrompt).catch(() => {
+      // handled by processTask when re-run
+    });
     return;
   }
 
@@ -364,6 +371,13 @@ async function processTask(
         const issues = Array.isArray(output?.issues) ? output.issues.join("; ") : "";
         const summary = issues ? `${status}\nissues: ${issues}` : status;
         sendAgentSummary(pi, t, stageId, summary);
+      }
+
+      const key = t.stageId ? getRunnerKey(t.id, t.stageId) : undefined;
+      if (key) {
+        const runner = taskRunners.get(key);
+        runner?.agent.dispose();
+        taskRunners.delete(key);
       }
 
       setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
@@ -582,7 +596,11 @@ function stopWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext): void {
   }
   currentRun.abortController.abort();
   currentRun = null;
-  for (const runner of taskRunners.values()) runner.agent.abort();
+  for (const runner of taskRunners.values()) {
+    runner.agent.abort();
+    runner.agent.dispose();
+  }
+  taskRunners.clear();
   if (currentState) {
     currentState.active = false;
     setState(pi, ctx, currentState);
