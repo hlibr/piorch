@@ -1,5 +1,6 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
+import { Text } from "@mariozechner/pi-tui";
 import { discoverAgents, findAgentByName } from "./agents.js";
 import { loadWorkflowConfig, type WorkflowConfig, type WorkflowStage, type WorkflowTask, type WorkflowWave } from "./config.js";
 import { updateStatus } from "./render.js";
@@ -11,8 +12,11 @@ interface WorkflowRunHandle {
   promise: Promise<void>;
 }
 
+const PM_MESSAGE_TYPE = "workflow-pm";
+
 let currentRun: WorkflowRunHandle | null = null;
 let currentState: WorkflowState | undefined;
+let pmBusy = false;
 
 function setState(pi: ExtensionAPI, ctx: ExtensionCommandContext, state: WorkflowState, persist = true) {
   const nextState = { ...state, updatedAt: Date.now() };
@@ -85,6 +89,34 @@ function formatToolArgs(args: unknown): string {
   }
   if (json.length > MAX_TOOL_ARGS_LENGTH) return `${json.slice(0, MAX_TOOL_ARGS_LENGTH)}...`;
   return json;
+}
+
+function sendPmMessage(pi: ExtensionAPI, text: string) {
+  pi.sendMessage({
+    customType: PM_MESSAGE_TYPE,
+    content: text,
+    display: true,
+  });
+}
+
+function buildWaveSummary(state: WorkflowState): string {
+  const lines = state.tasks.map((task) => {
+    const status = task.status === "verified" ? "verified" : task.status === "failed" ? "failed" : task.status;
+    return `${task.id}: ${task.title} (${status})`;
+  });
+  return lines.join("\n");
+}
+
+function buildPmChatPrompt(state: WorkflowState, message: string): string {
+  const summary = state.tasks.length > 0 ? buildWaveSummary(state) : "No tasks yet.";
+  return [
+    `Project goal: ${state.goal}`,
+    `Current wave: ${state.waveIndex + 1}`,
+    `Wave summary:\n${summary}`,
+    "User message:",
+    message,
+    "Respond conversationally. Do NOT output JSON.",
+  ].join("\n\n");
 }
 
 async function mapWithConcurrencyLimit<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>): Promise<void> {
@@ -293,43 +325,53 @@ async function runWave(
   );
 }
 
-function buildWaveSummary(state: WorkflowState): string {
-  const lines = state.tasks.map((task) => {
-    const status = task.status === "verified" ? "verified" : task.status === "failed" ? "failed" : task.status;
-    return `${task.id}: ${task.title} (${status})`;
-  });
-  return lines.join("\n");
+async function runPmAgent(
+  pi: ExtensionAPI,
+  config: WorkflowConfig,
+  agents: ReturnType<typeof discoverAgents>["agents"],
+  ctx: ExtensionContext,
+  signal: AbortSignal,
+  prompt: string,
+): Promise<string> {
+  const pmAgent = findAgentByName(agents, config.agents.pm);
+  if (!pmAgent) throw new Error(`PM agent not found: ${config.agents.pm}`);
+  if (pmBusy) throw new Error("PM is already running");
+  pmBusy = true;
+  try {
+    const result = await runAgent({
+      name: pmAgent.name,
+      task: prompt,
+      cwd: ctx.cwd,
+      systemPrompt: pmAgent.systemPrompt,
+      model: pmAgent.model,
+      tools: pmAgent.tools,
+      signal,
+    });
+    if (result.exitCode !== 0) throw new Error(result.stderr || "PM agent failed");
+    return result.outputText || "";
+  } finally {
+    pmBusy = false;
+  }
 }
 
 async function generateWaveFromPm(
+  pi: ExtensionAPI,
   config: WorkflowConfig,
   agents: ReturnType<typeof discoverAgents>["agents"],
   ctx: ExtensionCommandContext,
   signal: AbortSignal,
   previousSummary: string,
 ): Promise<{ done: boolean; wave?: WorkflowWave }> {
-  const pmAgent = findAgentByName(agents, config.agents.pm);
-  if (!pmAgent) throw new Error(`PM agent not found: ${config.agents.pm}`);
-
   const prompt = [
     `Project goal: ${config.goal}`,
     previousSummary ? `Previous wave summary:\n${previousSummary}` : "No previous wave summary.",
     "Return the next wave JSON response.",
   ].join("\n\n");
 
-  const result = await runAgent({
-    name: pmAgent.name,
-    task: prompt,
-    cwd: ctx.cwd,
-    systemPrompt: pmAgent.systemPrompt,
-    model: pmAgent.model,
-    tools: pmAgent.tools,
-    signal,
-  });
+  const outputText = await runPmAgent(pi, config, agents, ctx, signal, prompt);
+  sendPmMessage(pi, outputText);
 
-  if (result.exitCode !== 0) throw new Error(result.stderr || "PM agent failed");
-
-  const output = extractJson(result.outputText || "");
+  const output = extractJson(outputText || "");
   if (output.done === true) return { done: true };
   if (!output.wave) throw new Error("PM output missing wave");
   return { done: false, wave: output.wave as WorkflowWave };
@@ -379,7 +421,7 @@ async function startWorkflow(
             break;
           }
         } else {
-          const pmResult = await generateWaveFromPm(effectiveConfig, agents, ctx, abortController.signal, previousSummary);
+          const pmResult = await generateWaveFromPm(pi, effectiveConfig, agents, ctx, abortController.signal, previousSummary);
           if (pmResult.done) {
             break;
           }
@@ -443,6 +485,29 @@ export default function (pi: ExtensionAPI) {
     if (currentState) updateStatus(ctx, currentState);
   });
 
+  pi.on("input", async (event, ctx) => {
+    if (!currentState?.active) return { action: "continue" };
+    if (event.source === "extension") return { action: "continue" };
+    if (event.text.trim().startsWith("/")) return { action: "continue" };
+    if (pmBusy) {
+      if (ctx.hasUI) ctx.ui.notify("PM is busy. Try again shortly.", "warning");
+      return { action: "handled" };
+    }
+
+    try {
+      const { config } = loadWorkflowConfig(ctx.cwd, currentState.workflowName);
+      const { agents } = discoverAgents(ctx.cwd);
+      const effectiveConfig: WorkflowConfig = { ...config, goal: currentState.goal };
+      const prompt = buildPmChatPrompt(currentState, event.text);
+      const outputText = await runPmAgent(pi, effectiveConfig, agents, ctx, new AbortController().signal, prompt);
+      sendPmMessage(pi, outputText);
+      return { action: "handled" };
+    } catch (error: any) {
+      if (ctx.hasUI) ctx.ui.notify(error?.message || "PM chat failed", "error");
+      return { action: "handled" };
+    }
+  });
+
   pi.registerCommand("workflow", {
     description: "Manage workflow orchestrator",
     handler: async (args, ctx) => {
@@ -476,6 +541,11 @@ export default function (pi: ExtensionAPI) {
 
       ctx.ui?.notify("Usage: /workflow start|status|stop", "warning");
     },
+  });
+
+  pi.registerMessageRenderer(PM_MESSAGE_TYPE, (message, _options, theme) => {
+    const text = theme.fg("toolTitle", theme.bold("PM")) + theme.fg("muted", ": ") + message.content;
+    return new Text(text, 0, 0);
   });
 
   pi.registerTool({
