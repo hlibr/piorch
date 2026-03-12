@@ -24,14 +24,8 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
     const stage = task.stageId ? ` (${task.stageId})` : "";
     const agent = task.lastAgent ? ` [${task.lastAgent}]` : "";
     const note = task.lastNote ? ` — ${task.lastNote}` : "";
-    lines.push(`${tag} ${task.id}: ${task.title}${stage}${agent}${note}`);
-
-    if (task.lastOutput) {
-      const outputLines = task.lastOutput.split("\n");
-      for (const line of outputLines) {
-        lines.push(`   │ ${line}`);
-      }
-    }
+    const ticker = task.lastOutput ? ` | ${task.lastOutput}` : "";
+    lines.push(`${tag} ${task.id}: ${task.title}${stage}${agent}${note}${ticker}`);
   }
 
   ctx.ui.setWidget("workflow", [`Workflow: ${state.workflowName}`, ...lines]);

@@ -59,21 +59,20 @@ function normalizeGoal(goal?: string): string | undefined {
   return trimmed;
 }
 
-const MAX_OUTPUT_LINES = 40;
+const MAX_TICKER_CHARS = 160;
 const MAX_TOOL_ARGS_LENGTH = 160;
 
-function truncateLines(text: string): string {
-  const lines = text.split("\n");
-  if (lines.length <= MAX_OUTPUT_LINES) return text;
-  const tail = lines.slice(-MAX_OUTPUT_LINES);
-  const skipped = lines.length - tail.length;
-  return [`… ${skipped} lines trimmed`, ...tail].join("\n");
+function truncateTicker(text: string): string {
+  if (text.length <= MAX_TICKER_CHARS) return text;
+  const sliceLength = MAX_TICKER_CHARS - 1;
+  return `…${text.slice(-sliceLength)}`;
 }
 
 function appendOutput(task: TaskState, chunk: string, mode: "delta" | "line") {
   const current = task.lastOutput ?? "";
-  const next = mode === "line" ? (current ? `${current}\n${chunk}` : chunk) : current + chunk;
-  task.lastOutput = truncateLines(next);
+  const separator = mode === "line" && current ? " • " : "";
+  const next = mode === "line" ? `${current}${separator}${chunk}` : current + chunk;
+  task.lastOutput = truncateTicker(next.replace(/\s+/g, " ").trim());
 }
 
 function formatToolArgs(args: unknown): string {
@@ -192,7 +191,8 @@ async function processTask(
       });
       if (result.exitCode !== 0) throw new Error(result.stderr || "Agent failed");
       const outputText = result.outputText || "";
-      task.lastOutput = truncateLines(outputText);
+      const firstLine = outputText.split("\n")[0] ?? "";
+      task.lastOutput = truncateTicker(firstLine.trim());
       output = extractJson(outputText);
       if (typeof output?.status === "string") {
         task.lastNote = `status: ${output.status}`;
@@ -204,7 +204,7 @@ async function processTask(
     } catch (error: any) {
       const message = error?.message || "Agent output parse failed";
       task.lastNote = `error: ${message}`;
-      task.lastOutput = truncateLines(message);
+      task.lastOutput = truncateTicker(message);
       if (stage.id === "verify") {
         task.verifyOutput = { status: "fail", issues: [message] };
         task.issues = [message];
