@@ -63,11 +63,7 @@ Stop with:
 ## PM Chat Mode
 
 When a workflow is active, normal chat input is routed to the PM (commands still work).
-PM replies are shown in the main chat as:
-
-```text
-PM: <message>
-```
+PM replies are shown in the main chat as plain messages.
 
 ## Configuration
 
@@ -138,7 +134,7 @@ Run `/reload` after changes.
 ## Notes
 
 - PM wave output is summarized in chat (task titles + wave goal), not raw JSON.
-- The workflow widget includes a `PM: idle/responding...` status line.
+- The workflow widget includes a PM idle/responding status line.
 - Subagents run with `--no-extensions --no-skills --no-prompt-templates` to avoid tool noise.
 - Live ticker is UI‑only (not persisted).
 - Tasks can be stopped and messaged via `/workflow stop-task` and `/workflow message` (sessions are persisted per task stage).
