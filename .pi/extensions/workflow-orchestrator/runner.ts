@@ -49,7 +49,7 @@ function getFinalOutput(messages: Message[]): string {
 }
 
 export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
-  const args: string[] = ["--mode", "json", "-p", "--no-session"];
+  const args: string[] = ["--mode", "json", "-p", "--no-session", "--no-extensions", "--no-skills", "--no-prompt-templates"];
   if (input.model) args.push("--model", input.model);
   if (input.tools && input.tools.length > 0) args.push("--tools", input.tools.join(","));
 

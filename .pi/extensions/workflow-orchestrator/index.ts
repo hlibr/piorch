@@ -3,7 +3,7 @@ import { Type } from "@sinclair/typebox";
 import { Text } from "@mariozechner/pi-tui";
 import { discoverAgents, findAgentByName } from "./agents.js";
 import { loadWorkflowConfig, type WorkflowConfig, type WorkflowStage, type WorkflowTask, type WorkflowWave } from "./config.js";
-import { updateStatus } from "./render.js";
+import { setPmWidgetStatus, updateStatus } from "./render.js";
 import { runAgent } from "./runner.js";
 import { appendState, restoreState, type TaskState, type WorkflowState } from "./state.js";
 
@@ -64,7 +64,6 @@ function normalizeGoal(goal?: string): string | undefined {
 }
 
 const MAX_TICKER_CHARS = 160;
-const MAX_TOOL_ARGS_LENGTH = 160;
 
 function truncateTicker(text: string): string {
   if (text.length <= MAX_TICKER_CHARS) return text;
@@ -72,24 +71,23 @@ function truncateTicker(text: string): string {
   return `…${text.slice(-sliceLength)}`;
 }
 
-function appendOutput(task: TaskState, chunk: string, mode: "delta" | "line") {
-  const current = task.lastOutput ?? "";
-  const separator = mode === "line" && current ? " • " : "";
-  const next = mode === "line" ? `${current}${separator}${chunk}` : current + chunk;
-  task.lastOutput = truncateTicker(next.replace(/\s+/g, " ").trim());
+function lastSentence(text: string): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  const match = normalized.match(/[^.!?]*[.!?](?=\s|$)/g);
+  if (!match || match.length === 0) return normalized;
+  return match[match.length - 1].trim();
 }
 
-function formatToolArgs(args: unknown): string {
-  if (!args) return "";
-  let json = "";
-  try {
-    json = JSON.stringify(args);
-  } catch {
-    json = String(args);
+function appendOutput(task: TaskState, chunk: string, mode: "delta" | "line") {
+  const current = task.lastOutput ?? "";
+  if (mode === "delta") {
+    const next = lastSentence(`${current} ${chunk}`);
+    task.lastOutput = truncateTicker(next);
+    return;
   }
-  if (json.length > MAX_TOOL_ARGS_LENGTH) return `${json.slice(0, MAX_TOOL_ARGS_LENGTH)}...`;
-  return json;
+  task.lastOutput = truncateTicker(chunk.replace(/\s+/g, " ").trim());
 }
+
 
 function sendPmMessage(pi: ExtensionAPI, text: string) {
   pi.sendMessage({
@@ -102,6 +100,7 @@ function sendPmMessage(pi: ExtensionAPI, text: string) {
 function setPmStatus(ctx: ExtensionContext, text?: string) {
   if (!ctx.hasUI) return;
   ctx.ui.setStatus("workflow-pm", text);
+  setPmWidgetStatus(text ? text.replace(/^PM:\s*/i, "") : undefined);
 }
 
 function sendWorkflowNotice(pi: ExtensionAPI, text: string) {
@@ -224,12 +223,7 @@ async function processTask(
           }
           if (update.type === "tool_start") {
             task.lastNote = `tool: ${update.toolName}`;
-            appendOutput(task, `→ ${update.toolName} ${formatToolArgs(update.args)}`.trim(), "line");
-            setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] }, false);
-            return;
-          }
-          if (update.type === "tool_end") {
-            appendOutput(task, `← ${update.toolName} ${update.isError ? "error" : "done"}`.trim(), "line");
+            appendOutput(task, `tool ${update.toolName}`, "line");
             setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] }, false);
           }
         },
