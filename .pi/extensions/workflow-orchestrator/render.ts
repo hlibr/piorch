@@ -46,7 +46,7 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
   const maxTickerLines = taskListExpanded ? 1 : 2;
   const lines: string[] = [];
 
-  lines.push(theme.fg("toolTitle", shorten(`Workflow: ${state.workflowName}`, maxWidth)));
+  lines.push(theme.fg("text", shorten(`Workflow: ${state.workflowName}`, maxWidth)));
   lines.push(theme.fg("accent", shorten(`PM: ${pmWidgetStatus ?? "idle"}`, maxWidth)));
 
   const visibleTasks = sortedTasks.slice(0, maxTasks);
@@ -68,7 +68,17 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
     const header = `${tag} ${task.id}${agent}${stage}`;
     const remainingWidth = Math.max(20, maxWidth - header.length - note.length - 2);
     const title = shorten(task.title, remainingWidth);
-    lines.push(theme.fg("toolOutput", shorten(`${header}: ${title}${note}`, maxWidth)));
+    const statusColor =
+      task.status === "verified"
+        ? "success"
+        : task.status === "failed"
+          ? "error"
+          : task.status === "in_progress"
+            ? "warning"
+            : task.status === "stopped"
+              ? "muted"
+              : "text";
+    lines.push(theme.fg(statusColor, shorten(`${header}: ${title}${note}`, maxWidth)));
 
     if (task.status === "in_progress" && task.lastOutput && tickerShown < maxTickerLines) {
       lines.push(theme.fg("dim", shorten(`↳ ${task.lastOutput}`, maxWidth)));
