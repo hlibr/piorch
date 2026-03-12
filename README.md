@@ -148,7 +148,7 @@ Run `/reload` after changes.
 
 - Reload/restart stops running tasks and marks the workflow inactive; there’s no automatic resume.
 - No true resume after restart: workflow loop doesn’t resume; “in progress” tasks don’t advance unless manually restarted.
-- PM has no long-term memory: each PM response is a fresh run using the current state summary only.
+- PM memory is only per workflow run: it persists within a run, but is not restored after restart/reload.
 - PM chat routing can swallow normal chat: while a workflow is active, user input is always routed to PM with no toggle back.
 
 ## TODO
