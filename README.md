@@ -230,22 +230,12 @@ Run `/reload` after changing configuration files.
 
 - `/workflow start <name> [goal]`
 - `/workflow resume` (continue from saved state)
-- `/workflow status`
 - `/workflow stop`
 - `/workflow stop-task <id>`
 - `/workflow message <id> <message>`
 - `/workflow expand`
 - `/workflow collapse`
 - `/workflow help`
-
-## Notes
-
-- PM wave output is summarized in chat (task titles + wave goal), not raw JSON.
-- The workflow widget includes a `PM: idle/responding...` status line.
-- Subagents run with `--no-extensions --no-skills --no-prompt-templates` to avoid tool noise.
-- Live ticker is UI‑only (not persisted).
-- Tasks can be stopped and messaged via `/workflow stop-task` and `/workflow message` (sessions are persisted per task stage).
-- Use `/workflow expand` to show more tasks in the widget, `/workflow collapse` to revert.
 
 ## TODO
 
@@ -254,7 +244,6 @@ Run `/reload` after changing configuration files.
 - Expand tasks
 - Add integration tests for RPC runner and end-to-end flows
 - User message routing to PM can swallow chat: no toggle to return to normal chat
-- No UI indicator for stopped tasks beyond ⏸ (e.g., “stopped by user”)
 
 ## License
 
