@@ -35,14 +35,49 @@ IMPLEMENTATION.md
 
 ## Installation
 
-Clone this repo and run pi from the repo root:
+### Option 1: Install as Pi Package (Easiest)
 
 ```bash
-cd /path/to/piorch
+pi install git:github.com/hlibr/piorch
+```
+
+This automatically installs the extension and agents to your project. Then run:
+
+```bash
+pi
+/workflow start default "Your goal"
+```
+
+### Option 2: Manual Copy
+
+Copy the extension into your project:
+
+```bash
+# From your project directory
+mkdir -p .pi/extensions
+cp -r /path/to/piorch/.pi/extensions/workflow-orchestrator .pi/extensions/
+cp -r /path/to/piorch/.pi/workflows .pi/
+cp -r /path/to/piorch/.pi/agents .pi/
+```
+
+Then run pi from your project:
+
+```bash
+cd /path/to/your-project
 pi
 ```
 
-The extension is auto‑discovered from `.pi/extensions/workflow-orchestrator`.
+### Option 3: Develop/Test the Extension
+
+Clone this repo and run pi from the repo root:
+
+```bash
+git clone https://github.com/hlibr/piorch.git
+cd piorch
+pi
+```
+
+Note: When working from the repo root, the agent will see test files and development artifacts. For production use, install via Option 1 or 2.
 
 ## Quick Start
 

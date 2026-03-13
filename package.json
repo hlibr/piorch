@@ -3,6 +3,25 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "description": "Customizable PM → Dev → Verifier workflow orchestrator for Pi",
+  "keywords": [
+    "pi-package",
+    "workflow",
+    "orchestrator",
+    "multi-agent"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hlibr/piorch.git"
+  },
+  "pi": {
+    "extensions": [
+      ".pi/extensions/workflow-orchestrator"
+    ],
+    "skills": [
+      ".pi/agents"
+    ]
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint \".pi/extensions/**/*.ts\"",
