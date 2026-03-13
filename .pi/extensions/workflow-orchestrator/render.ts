@@ -54,14 +54,12 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
   const theme = ctx.ui.theme;
   const maxWidth = 80;
   const maxTasks = taskListExpanded ? 10 : 4;
-  const maxTickerLines = taskListExpanded ? 1 : 2;
   const lines: string[] = [];
 
   lines.push(theme.fg("text", shorten(`Workflow: ${state.workflowName}`, maxWidth)));
   lines.push(theme.fg("accent", shorten(`PM: ${pmWidgetStatus ?? "idle"}`, maxWidth)));
 
   const visibleTasks = sortedTasks.slice(0, maxTasks);
-  let tickerShown = 0;
   for (const task of visibleTasks) {
     const ageMs = task.lastActivityAt ? Date.now() - task.lastActivityAt : undefined;
     const isActive = typeof ageMs === "number" && ageMs < 4000;
@@ -100,9 +98,8 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
               : "text";
     lines.push(theme.fg(statusColor, shorten(`${header}: ${title}${note}${ageText}`, maxWidth)));
 
-    if (task.status === "in_progress" && task.lastOutput && tickerShown < maxTickerLines) {
+    if (task.status === "in_progress" && task.lastOutput) {
       lines.push(theme.fg("dim", shorten(`↳ ${task.lastOutput}`, maxWidth)));
-      tickerShown += 1;
     }
   }
 
