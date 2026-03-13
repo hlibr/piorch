@@ -97,12 +97,12 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
               ? "muted"
               : "text";
     const content = `${header}: ${title}${note}`;
-    const ageText = ageMs ? ` · ${formatAge(ageMs)}` : "";
     const ticker =
       task.status === "in_progress" && task.lastOutput
         ? ` ${theme.fg("dim", task.lastOutput)}`
         : "";
-    lines.push(theme.fg(statusColor, shorten(content + ticker, maxWidth)) + ageText);
+    const lineContent = shorten(content, maxWidth) + ticker;
+    lines.push(theme.fg(statusColor, lineContent) + ageText);
   }
 
   const remaining = Math.max(0, sortedTasks.length - visibleTasks.length);
