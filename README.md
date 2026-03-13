@@ -284,7 +284,6 @@ Run `/reload` after changing configuration files.
 - Expand tasks
 - Add integration tests for RPC runner and end-to-end flows
 - User message routing to PM can swallow chat: no toggle to return to normal chat
-- No UI indicator for stopped tasks beyond ⏸ (e.g., “stopped by user”)
 
 ## License
 
