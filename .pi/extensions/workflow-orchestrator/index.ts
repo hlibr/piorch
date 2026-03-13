@@ -39,6 +39,7 @@ let pmBusy = false;
 let pmRunner: RpcAgent | null = null;
 let statusInterval: ReturnType<typeof setInterval> | null = null;
 const taskRunners = new Map<string, TaskRunner>();
+const taskLocks = new Set<string>();
 
 function setState(pi: ExtensionAPI, ctx: ExtensionContext, state: WorkflowState, persist = true) {
   const nextState = { ...state, updatedAt: Date.now() };
@@ -322,41 +323,53 @@ async function messageTask(
   agents: ReturnType<typeof discoverAgents>["agents"],
 ) {
   if (!task.stageId) throw new Error("Task has no active stage");
-  const stage = findStageById(config.taskFlow.stages, task.stageId);
-  if (!stage) throw new Error(`Stage not found: ${task.stageId}`);
 
-  const key = getRunnerKey(task.id, task.stageId);
-  const runner = taskRunners.get(key);
-  if (runner) {
-    task.lastNote = "running";
-    task.status = "in_progress";
-    setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
-    if (runner.agent.isRunning()) {
-      runner.agent.sendSteer(message);
-      return;
-    }
-    const taskPrompt = `${message}`;
-    void runner.agent.runPrompt(taskPrompt).catch(() => {
-      // handled by processTask when re-run
-    });
-    return;
+  // Prevent concurrent modifications to the same task
+  if (taskLocks.has(task.id)) {
+    throw new Error(`Task ${task.id} is already being modified`);
   }
 
-  if (!currentState?.wave) throw new Error("No active wave");
-  task.resumeMessage = message;
-  task.lastNote = "running";
-  task.status = "in_progress";
-  setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
-  void processTask(
-    pi,
-    ctx,
-    config,
-    task,
-    currentState.wave,
-    agents,
-    new AbortController().signal,
-    task.stageId,
-  );
+  taskLocks.add(task.id);
+  try {
+    const stage = findStageById(config.taskFlow.stages, task.stageId);
+    if (!stage) throw new Error(`Stage not found: ${task.stageId}`);
+
+    const key = getRunnerKey(task.id, task.stageId);
+    const runner = taskRunners.get(key);
+    if (runner) {
+      if (!currentState) throw new Error("No workflow state");
+      task.lastNote = "running";
+      task.status = "in_progress";
+      setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
+      if (runner.agent.isRunning()) {
+        runner.agent.sendSteer(message);
+        return;
+      }
+      const taskPrompt = `${message}`;
+      void runner.agent.runPrompt(taskPrompt).catch(() => {
+        // handled by processTask when re-run
+      });
+      return;
+    }
+
+    if (!currentState?.wave) throw new Error("No active wave");
+    task.resumeMessage = message;
+    task.lastNote = "running";
+    task.status = "in_progress";
+    setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
+    void processTask(
+      pi,
+      ctx,
+      config,
+      task,
+      currentState.wave,
+      agents,
+      new AbortController().signal,
+      task.stageId,
+    );
+  } finally {
+    taskLocks.delete(task.id);
+  }
 }
 
 function findStageById(stages: WorkflowStage[], id: string): WorkflowStage | undefined {
@@ -388,6 +401,7 @@ async function processTask(
     startStageId: startStageId,
     isStopped: (t) => t.status === "stopped" || signal.aborted,
     onStageStart: (stage, t) => {
+      if (!currentState) return; // Guard against workflow stop during execution
       const workflowStage = stage as WorkflowStage;
       t.status = "in_progress";
       t.stageId = workflowStage.id;
@@ -395,7 +409,7 @@ async function processTask(
       t.lastNote = "running";
       t.lastOutput = undefined;
       t.lastActivityAt = Date.now();
-      setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
+      setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
     },
     runStage: async (stage, t) => {
       const workflowStage = stage as WorkflowStage;
@@ -439,6 +453,8 @@ async function processTask(
       return { output, outputText };
     },
     applyOutput: (t, stageId, result) => {
+      if (!currentState) return; // Guard against workflow stop during execution
+
       const output = result.output;
       if (stageId === "develop") t.devOutput = output;
       if (stageId === "verify") t.verifyOutput = output;
@@ -477,9 +493,10 @@ async function processTask(
         taskRunners.delete(key);
       }
 
-      setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
+      setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
     },
     applyVerifyFailure: (t, _stageId, result, errorMessage) => {
+      if (!currentState) return false; // Guard against workflow stop during execution
       const output = result?.output;
       const issues = output?.issues ?? (errorMessage ? [errorMessage] : []);
       t.verifyOutput = { status: "fail", issues };
@@ -487,26 +504,29 @@ async function processTask(
       t.retries += 1;
       t.lastNote = errorMessage ? `error: ${errorMessage}` : "fail";
       if (errorMessage) t.lastOutput = truncateTicker(errorMessage);
-      setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
+      setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
       return t.retries <= (config.maxTaskRetries ?? 2);
     },
     applyGenericFailure: (t, errorMessage) => {
+      if (!currentState) return false; // Guard against workflow stop during execution
       t.issues = [errorMessage];
       t.retries += 1;
       t.lastNote = `error: ${errorMessage}`;
       t.lastOutput = truncateTicker(errorMessage);
-      setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
+      setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
       return t.retries <= (config.maxTaskRetries ?? 2);
     },
     markVerified: (t, stageId) => {
+      if (!currentState) return; // Guard against workflow stop during execution
       t.status = "verified";
       t.stageId = stageId;
-      setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
+      setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
     },
     markFailed: (t, stageId) => {
+      if (!currentState) return; // Guard against workflow stop during execution
       t.status = "failed";
       t.stageId = stageId;
-      setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
+      setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
     },
     getField: getByPath,
     getNextStageId: (stagesList, stageId) => getNextStageId(stagesList as WorkflowStage[], stageId),
@@ -598,6 +618,10 @@ async function runPmAgent(
   try {
     const runner = getPmRunner(ctx, config, agents);
     return await runner.runPrompt(prompt, { signal });
+  } catch (error) {
+    // Dispose runner on error to prevent resource leaks
+    disposePmRunner();
+    throw error;
   } finally {
     pmBusy = false;
     setPmStatus(ctx, undefined);

@@ -363,12 +363,17 @@ export class RpcAgent {
     }
 
     if (event.type === "message_end" && event.message?.role === "assistant") {
+      const run = this.currentRun;
+      if (!run) return; // Race condition: agent_end may have cleared currentRun
+
       const msg = event.message as Message;
       for (const part of msg.content) {
-        if (typeof part === "string") this.currentRun!.lastAssistantText = part;
-        else if (part.type === "text") this.currentRun!.lastAssistantText = part.text;
-        else if (part.type === "toolCall") {
-          this.currentRun?.onUpdate?.({
+        if (typeof part === "string") {
+          run.lastAssistantText = part;
+        } else if (part.type === "text") {
+          run.lastAssistantText = part.text;
+        } else if (part.type === "toolCall") {
+          run.onUpdate?.({
             type: "tool_start",
             toolName: part.name,
             args: part.arguments,

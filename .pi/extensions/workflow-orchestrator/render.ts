@@ -81,10 +81,7 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
     const ageText = ageMs ? ` · ${formatAge(ageMs)}` : "";
     const header = `${tag} ${task.id}${agent}${stage}`;
     const ageWidth = ageText.length;
-    const remainingWidth = Math.max(
-      20,
-      maxWidth - header.length - ageWidth - 2,
-    );
+    const remainingWidth = Math.max(20, maxWidth - header.length - ageWidth - 2);
     const title = shorten(task.title, remainingWidth);
     const statusColor =
       task.status === "verified"

@@ -74,8 +74,28 @@ export interface LoadedWorkflow {
   path: string;
 }
 
+function sanitizeWorkflowName(name: string): string {
+  if (!name || typeof name !== "string") {
+    throw new Error("Workflow name is required");
+  }
+
+  // Only allow alphanumeric, dash, underscore
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+    throw new Error(
+      `Invalid workflow name: ${name}. Only alphanumeric, dash, and underscore allowed.`,
+    );
+  }
+
+  if (name.length > 50) {
+    throw new Error("Workflow name too long (max 50 characters)");
+  }
+
+  return name;
+}
+
 export function loadWorkflowConfig(cwd: string, name: string): LoadedWorkflow {
-  const workflowPath = path.join(cwd, ".pi", "workflows", `${name}.workflow.json`);
+  const safeName = sanitizeWorkflowName(name);
+  const workflowPath = path.join(cwd, ".pi", "workflows", `${safeName}.workflow.json`);
   if (!fs.existsSync(workflowPath)) {
     throw new Error(`Workflow not found: ${workflowPath}`);
   }
@@ -96,9 +116,15 @@ export function loadWorkflowConfig(cwd: string, name: string): LoadedWorkflow {
   }
 
   const config = parsed as WorkflowConfig;
+
+  // Apply defaults
   config.maxWaves = config.maxWaves ?? 10;
   config.maxTaskRetries = config.maxTaskRetries ?? 2;
   config.parallelism = config.parallelism ?? 1;
+
+  if (config.parallelism < 1) {
+    throw new Error("parallelism must be at least 1");
+  }
 
   return { config, path: workflowPath };
 }
