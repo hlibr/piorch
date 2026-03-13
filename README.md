@@ -2,6 +2,8 @@
 
 Customizable PM → Dev → Verifier workflow for **pi** using an extension and subagents. Tasks run in waves, verifiers loop failures back to developers, and the PM can generate the next wave. The workflow is fully configurable via JSON and agent prompt files.
 
+<img width="881" height="593" alt="Screenshot 2026-03-13 at 10 35 01 AM" src="https://github.com/user-attachments/assets/2cae9b36-3ffd-438d-afdd-ccd172baf5c8" />
+
 ## Features
 
 - PM‑driven or static task waves
