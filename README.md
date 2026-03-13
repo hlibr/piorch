@@ -137,7 +137,7 @@ model: gpt-5.4  # ← Change this to your model
 **Options:**
 
 1. **Use Pi's default model** - Remove the `model:` line entirely
-2. **Use a specific model** - Change to `anthropic/claude-sonnet-4-5`, `openai/gpt-4o`, etc.
+2. **Use a specific model** - Change to `anthropic/claude-sonnet-4-5`, `openai/gpt-4o`, `openrouter/deepseek-r1`, etc.
 3. **Use different models per agent** - Set different models for PM, developer, and verifier
 
 Run `/reload` after making changes.
@@ -183,43 +183,13 @@ Edit `.pi/agents/*.md` to customize agent behavior:
 ---
 name: developer
 description: Implements assigned tasks
-model: openrouter/hunter-alpha # Optional: override default model
+model: gpt-5.4 # Required: change this placeholder
 tools: read,edit,write,bash # Optional: limit available tools
 ---
 ```
 
 **System prompt:**
-The markdown body becomes the agent's system prompt. Customize it to change behavior.
-
-### Per-Agent Models
-
-The included agents use `gpt-5.4` as a placeholder. **Change these before use:**
-
-```yaml
-# .pi/agents/pm.md
-model: gpt-5.4  # ← Change this
-
-# .pi/agents/developer.md
-model: gpt-5.4  # ← Change this
-
-# .pi/agents/verifier.md
-model: gpt-5.4  # ← Change this
-```
-
-**To use different models:**
-
-1. **Use Pi's default model** - Remove the `model:` line
-2. **Use a specific model** - Change to your preferred model:
-
-```yaml
-model: anthropic/claude-sonnet-4-5
-# or
-model: openai/gpt-4o
-# or
-model: openrouter/deepseek-r1
-```
-
-3. Run `/reload` to apply changes
+The markdown body becomes the agent's system prompt. Customize it to change behavior
 
 ### Custom Model Providers (Optional)
 
