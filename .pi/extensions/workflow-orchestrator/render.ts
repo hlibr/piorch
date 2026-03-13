@@ -52,7 +52,7 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
   });
 
   const theme = ctx.ui.theme;
-  const maxWidth = 90;
+  const maxWidth = 120;
   const maxTasks = taskListExpanded ? 10 : 4;
   const lines: string[] = [];
 
@@ -96,12 +96,13 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
             : task.status === "stopped"
               ? "muted"
               : "text";
-    const content = `${header}: ${title}${note}${ageText}`;
+    const content = `${header}: ${title}${note}`;
+    const ageText = ageMs ? ` · ${formatAge(ageMs)}` : "";
     const ticker =
       task.status === "in_progress" && task.lastOutput
         ? ` ${theme.fg("dim", task.lastOutput)}`
         : "";
-    lines.push(theme.fg(statusColor, shorten(content + ticker, maxWidth)));
+    lines.push(theme.fg(statusColor, shorten(content + ticker, maxWidth)) + ageText);
   }
 
   const remaining = Math.max(0, sortedTasks.length - visibleTasks.length);
