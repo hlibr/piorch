@@ -13,6 +13,7 @@ export interface TaskState extends WorkflowTask {
   lastAgent?: string;
   lastNote?: string;
   lastOutput?: string;
+  lastActivityAt?: number;
   sessionFiles?: Record<string, string>;
   resumeMessage?: string;
 }

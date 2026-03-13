@@ -12,9 +12,20 @@ export function setTaskListExpanded(expanded: boolean) {
   taskListExpanded = expanded;
 }
 
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
 function shorten(text: string, max: number): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max - 1)}…`;
+}
+
+function formatAge(ms: number): string {
+  const seconds = Math.max(1, Math.floor(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h`;
 }
 
 export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void {
@@ -52,6 +63,11 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
   const visibleTasks = sortedTasks.slice(0, maxTasks);
   let tickerShown = 0;
   for (const task of visibleTasks) {
+    const ageMs = task.lastActivityAt ? Date.now() - task.lastActivityAt : undefined;
+    const isActive = typeof ageMs === "number" && ageMs < 4000;
+    const spinner = isActive
+      ? SPINNER_FRAMES[Math.floor(Date.now() / 120) % SPINNER_FRAMES.length]
+      : "…";
     const tag =
       task.status === "verified"
         ? "✓"
@@ -60,13 +76,17 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
           : task.status === "stopped"
             ? "⏸"
             : task.status === "in_progress"
-              ? "…"
+              ? spinner
               : "•";
     const stage = task.stageId ? ` (${task.stageId})` : "";
     const agent = task.lastAgent ? ` [${task.lastAgent}]` : "";
     const note = task.lastNote ? ` — ${task.lastNote}` : "";
+    const ageText = ageMs ? ` · ${formatAge(ageMs)}` : "";
     const header = `${tag} ${task.id}${agent}${stage}`;
-    const remainingWidth = Math.max(20, maxWidth - header.length - note.length - 2);
+    const remainingWidth = Math.max(
+      20,
+      maxWidth - header.length - note.length - ageText.length - 2,
+    );
     const title = shorten(task.title, remainingWidth);
     const statusColor =
       task.status === "verified"
@@ -78,7 +98,7 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
             : task.status === "stopped"
               ? "muted"
               : "text";
-    lines.push(theme.fg(statusColor, shorten(`${header}: ${title}${note}`, maxWidth)));
+    lines.push(theme.fg(statusColor, shorten(`${header}: ${title}${note}${ageText}`, maxWidth)));
 
     if (task.status === "in_progress" && task.lastOutput && tickerShown < maxTickerLines) {
       lines.push(theme.fg("dim", shorten(`↳ ${task.lastOutput}`, maxWidth)));

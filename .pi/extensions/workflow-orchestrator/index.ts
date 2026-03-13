@@ -37,6 +37,7 @@ let currentRun: WorkflowRunHandle | null = null;
 let currentState: WorkflowState | undefined;
 let pmBusy = false;
 let pmRunner: RpcAgent | null = null;
+let statusInterval: ReturnType<typeof setInterval> | null = null;
 const taskRunners = new Map<string, TaskRunner>();
 
 function setState(pi: ExtensionAPI, ctx: ExtensionContext, state: WorkflowState, persist = true) {
@@ -44,6 +45,20 @@ function setState(pi: ExtensionAPI, ctx: ExtensionContext, state: WorkflowState,
   currentState = nextState;
   if (persist) appendState(pi, nextState);
   updateStatus(ctx, nextState);
+}
+
+function startStatusTicker(ctx: ExtensionContext) {
+  if (!ctx.hasUI) return;
+  if (statusInterval) clearInterval(statusInterval);
+  statusInterval = setInterval(() => {
+    if (currentState) updateStatus(ctx, currentState);
+  }, 1000);
+}
+
+function stopStatusTicker() {
+  if (!statusInterval) return;
+  clearInterval(statusInterval);
+  statusInterval = null;
 }
 
 function getByPath(obj: any, path: string): any {
@@ -104,6 +119,7 @@ function lastSentence(text: string): string {
 
 function appendOutput(task: TaskState, chunk: string, mode: "delta" | "line") {
   const current = task.lastOutput ?? "";
+  task.lastActivityAt = Date.now();
   if (mode === "delta") {
     const next = lastSentence(`${current} ${chunk}`);
     task.lastOutput = truncateTicker(next);
@@ -378,6 +394,7 @@ async function processTask(
       t.lastAgent = workflowStage.agent;
       t.lastNote = "running";
       t.lastOutput = undefined;
+      t.lastActivityAt = Date.now();
       setState(pi, ctx, { ...currentState!, tasks: [...currentState!.tasks] });
     },
     runStage: async (stage, t) => {
@@ -439,6 +456,7 @@ async function processTask(
           ? output.summary
           : (result.outputText.split("\n")[0] ?? "");
       t.lastOutput = truncateTicker(tickerSource.trim());
+      t.lastActivityAt = Date.now();
 
       if (stageId === "develop") {
         const summary =
@@ -878,9 +896,11 @@ export default function (pi: ExtensionAPI) {
     setPmStatus(ctx, undefined);
     taskRunners.clear();
     disposePmRunner();
+    startStatusTicker(ctx);
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
+    stopStatusTicker();
     if (currentRun) {
       currentRun.abortController.abort();
       currentRun = null;
