@@ -104,29 +104,101 @@ PM replies are shown in the main chat as plain messages.
 
 ## Configuration
 
-### Workflow config
+### Quick Start
+
+The extension includes pre-configured agents that use:
+
+- **PM**: `openrouter/hunter` (requires OpenRouter API key or setup)
+- **Developer/Verifier**: `qwen3-coder-next` (requires setup)
+
+**To use your own models**, edit the `model:` field in `.pi/agents/*.md` files, or remove it to use Pi's default model.
+
+### Workflow Configuration
 
 Edit `.pi/workflows/default.workflow.json` to customize:
 
-- agent names
-- stages and transitions
-- wave source (PM or static)
-- retries and parallelism
-- allowedExtensions (whitelist extensions for all subagents)
-- allowedExtensionsByAgent (per-agent extension allowlists)
-- task requirements (optional `requirements` field, passed only to verifier)
+- **agent names** - Which agent files to use (pm, developer, verifier)
+- **stages and transitions** - Customize the dev/verify loop
+- **wave source** - PM-driven or static task waves
+- **parallelism** - How many tasks to run concurrently (default: 1)
+- **maxWaves** - Maximum number of waves (default: 10)
+- **maxTaskRetries** - Retry limit per task (default: 2)
+- **allowedExtensions** - Whitelist extensions for all subagents
+- **allowedExtensionsByAgent** - Per-agent extension allowlists
+- **task requirements** - Optional `requirements` field passed only to verifier
 
-### Agents
+Example:
 
-Edit `.pi/agents/*.md` for prompts and per‑agent models:
-
-```yaml
-model: openrouter/hunter-alpha
+```json
+{
+  "name": "default",
+  "goal": "Implement the requested features",
+  "parallelism": 2,
+  "maxWaves": 10,
+  "maxTaskRetries": 3,
+  "agents": {
+    "pm": "pm",
+    "developer": "developer",
+    "verifier": "verifier"
+  }
+}
 ```
 
-## Models (OpenRouter + Local LLM)
+### Agent Configuration
 
-Create `~/.pi/agent/models.json`:
+Edit `.pi/agents/*.md` to customize agent behavior:
+
+**Frontmatter options:**
+
+```yaml
+---
+name: developer
+description: Implements assigned tasks
+model: openrouter/hunter-alpha # Optional: override default model
+tools: read,edit,write,bash # Optional: limit available tools
+---
+```
+
+**System prompt:**
+The markdown body becomes the agent's system prompt. Customize it to change behavior.
+
+### Per-Agent Models
+
+The included agents are pre-configured with specific models:
+
+```yaml
+# .pi/agents/pm.md
+model: openrouter/hunter
+
+# .pi/agents/developer.md
+model: qwen3-coder-next
+
+# .pi/agents/verifier.md
+model: qwen3-coder-next
+```
+
+**To use different models:**
+
+1. Edit the `model:` field in the agent files
+2. Or remove the `model:` line to use Pi's default model
+3. Run `/reload` to apply changes
+
+Example - use Claude for all agents:
+
+```yaml
+# Remove or comment out the model line
+# model: openrouter/hunter
+```
+
+Or specify a different model:
+
+```yaml
+model: anthropic/claude-sonnet-4-5
+```
+
+### Custom Model Providers (Optional)
+
+To use models not built into Pi, create `~/.pi/agent/models.json`:
 
 ```json
 {
@@ -147,17 +219,17 @@ Create `~/.pi/agent/models.json`:
 }
 ```
 
-Then set models in `.pi/agents/*.md`:
+Then reference these models in agent frontmatter:
 
 ```yaml
-# pm.md
+# .pi/agents/pm.md
 model: openrouter/hunter-alpha
 
-# developer.md / verifier.md
+# .pi/agents/developer.md
 model: local-model
 ```
 
-Run `/reload` after changes.
+Run `/reload` after changing configuration files.
 
 ## Commands
 
