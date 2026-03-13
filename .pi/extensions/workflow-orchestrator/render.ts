@@ -52,7 +52,7 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
   });
 
   const theme = ctx.ui.theme;
-  const maxWidth = 120;
+  const maxWidth = 60;
   const maxTasks = taskListExpanded ? 10 : 3;
   const lines: string[] = [];
 
@@ -78,12 +78,12 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
               : "•";
     const stage = task.stageId ? ` (${task.stageId})` : "";
     const agent = task.lastAgent ? ` [${task.lastAgent}]` : "";
-    const note = task.lastNote ? ` — ${task.lastNote}` : "";
     const ageText = ageMs ? ` · ${formatAge(ageMs)}` : "";
     const header = `${tag} ${task.id}${agent}${stage}`;
+    const ageWidth = ageText.length;
     const remainingWidth = Math.max(
       20,
-      maxWidth - header.length - note.length - ageText.length - 2,
+      maxWidth - header.length - ageWidth - 2,
     );
     const title = shorten(task.title, remainingWidth);
     const statusColor =
@@ -96,7 +96,14 @@ export function updateStatus(ctx: ExtensionContext, state?: WorkflowState): void
             : task.status === "stopped"
               ? "muted"
               : "text";
-    lines.push(theme.fg(statusColor, shorten(`${header}: ${title}${note}${ageText}`, maxWidth)));
+    const taskLine = `${header}: ${title}`;
+    const totalWidth = taskLine.length + ageWidth;
+    if (totalWidth > maxWidth) {
+      const safeLine = shorten(taskLine, maxWidth - ageWidth);
+      lines.push(theme.fg(statusColor, safeLine + ageText));
+    } else {
+      lines.push(theme.fg(statusColor, taskLine + ageText));
+    }
 
     if (task.status === "in_progress" && task.lastOutput) {
       lines.push(theme.fg("dim", shorten(`↳ ${task.lastOutput}`, maxWidth)));

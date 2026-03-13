@@ -143,11 +143,6 @@ Run `/reload` after changes.
 - Tasks can be stopped and messaged via `/workflow stop-task` and `/workflow message` (sessions are persisted per task stage).
 - Use `/workflow expand` to show more tasks in the widget, `/workflow collapse` to revert.
 
-## Known Issues
-
-- PM memory persists across runs for the same workflow name; it does not reset unless you delete the PM session file.
-- PM chat routing can swallow normal chat: while a workflow is active, user input is always routed to PM with no toggle back.
-
 ## TODO
 
 - Better UI (colors)
