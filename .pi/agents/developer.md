@@ -1,7 +1,7 @@
 ---
 name: developer
 description: Implements assigned tasks.
-model: qwen3-coder-next
+model: gpt-5.4
 tools: read,edit,write,bash,grep,find,ls
 ---
 

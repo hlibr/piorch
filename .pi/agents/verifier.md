@@ -1,7 +1,7 @@
 ---
 name: verifier
 description: Reviews developer work and validates requirements.
-model: qwen3-coder-next
+model: gpt-5.4
 tools: read,grep,find,ls,bash
 ---
 

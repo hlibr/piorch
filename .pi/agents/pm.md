@@ -1,7 +1,7 @@
 ---
 name: pm
 description: Project manager who plans and delegates tasks in waves.
-model: openrouter/hunter
+model: gpt-5.4
 tools: read,grep,find,ls
 ---
 
