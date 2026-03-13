@@ -367,6 +367,13 @@ export class RpcAgent {
       for (const part of msg.content) {
         if (typeof part === "string") this.currentRun!.lastAssistantText = part;
         else if (part.type === "text") this.currentRun!.lastAssistantText = part.text;
+        else if (part.type === "toolCall") {
+          this.currentRun?.onUpdate?.({
+            type: "tool_start",
+            toolName: part.name,
+            args: part.arguments,
+          });
+        }
       }
     }
 
