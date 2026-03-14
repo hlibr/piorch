@@ -43,7 +43,7 @@ pi install git:github.com/hlibr/piorch
 
 This automatically installs the extension and agents to your project.
 
-**⚠️ Important: Configure Models Before Use**
+## ⚠️ Important: Configure Models Before Use
 
 The agents are pre-configured with `gpt-5.4` as a placeholder. You must edit the model settings before starting a workflow:
 
