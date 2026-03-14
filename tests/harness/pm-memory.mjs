@@ -6,7 +6,9 @@ import path from "node:path";
 const model = process.env.PI_TEST_MODEL;
 
 if (!model) {
-  console.error("PI_TEST_MODEL is required to run this harness (e.g. anthropic/claude-sonnet-4-5).");
+  console.error(
+    "PI_TEST_MODEL is required to run this harness (e.g. anthropic/claude-sonnet-4-5).",
+  );
   process.exit(1);
 }
 

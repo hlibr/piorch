@@ -12,20 +12,20 @@ export default [
       parser: tsParser,
       parserOptions: {
         project: "./tsconfig.json",
-        sourceType: "module"
+        sourceType: "module",
       },
       globals: {
-        ...globals.node
-      }
+        ...globals.node,
+      },
     },
     plugins: {
-      "@typescript-eslint": tseslint
+      "@typescript-eslint": tseslint,
     },
     rules: {
       ...tseslint.configs.recommended.rules,
       "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }]
-    }
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+    },
   },
-  prettier
+  prettier,
 ];
