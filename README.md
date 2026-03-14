@@ -239,6 +239,8 @@ Run `/reload` after changing configuration files.
 
 ## TODO
 
+- Fix silent task fails
+- Add agent tooling
 - Better UI (colors)
 - Fix user messages not appearing in chat
 - Expand tasks
