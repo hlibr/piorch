@@ -3,6 +3,7 @@
   "goal": "Implement the requested project features using PM → Dev → Verifier waves.",
   "maxWaves": 10,
   "maxTaskRetries": 3,
+  "maxPmRetries": 3,
   "parallelism": 2,
   "allowedExtensionsByAgent": {
     "pm": ["./.pi/extensions/workflow-pm-tools/index.ts"],

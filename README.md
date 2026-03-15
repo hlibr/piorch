@@ -156,6 +156,7 @@ Edit `.pi/workflows/default.workflow.json` to customize:
 - **parallelism** - How many tasks to run concurrently (default: 1)
 - **maxWaves** - Maximum number of waves (default: 10)
 - **maxTaskRetries** - Retry limit per task (default: 2)
+- **maxPmRetries** - Retry limit for PM wave generation (default: 3)
 - **allowedExtensions** - Whitelist extensions for all subagents
 - **allowedExtensionsByAgent** - Per-agent extension allowlists
 
@@ -168,6 +169,7 @@ Example:
   "parallelism": 2,
   "maxWaves": 10,
   "maxTaskRetries": 3,
+  "maxPmRetries": 3,
   "agents": {
     "pm": "pm",
     "developer": "developer",

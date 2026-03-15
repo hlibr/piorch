@@ -46,6 +46,7 @@ const WorkflowSchema = Type.Object({
   goal: Type.String(),
   maxWaves: Type.Optional(Type.Number()),
   maxTaskRetries: Type.Optional(Type.Number()),
+  maxPmRetries: Type.Optional(Type.Number()),
   parallelism: Type.Optional(Type.Number()),
   allowedExtensions: Type.Optional(Type.Array(Type.String())),
   allowedExtensionsByAgent: Type.Optional(AllowedExtensionsByAgentSchema),

@@ -142,7 +142,7 @@ function sendWorkflowNotice(pi: ExtensionAPI, text: string) {
 }
 
 function buildWaveSummary(state: WorkflowState): string {
-  const lines = state.tasks.map((task) => {
+  const lines = (state.tasks ?? []).map((task) => {
     const status =
       task.status === "verified" ? "verified" : task.status === "failed" ? "failed" : task.status;
     const note = task.lastNote ? ` — ${task.lastNote}` : "";
@@ -157,7 +157,7 @@ function buildWaveSummary(state: WorkflowState): string {
 }
 
 function summarizeWave(wave: WorkflowWave): string {
-  const lines = wave.tasks.map((task) => `${task.id}: ${task.title}`);
+  const lines = (wave.tasks ?? []).map((task) => `${task.id}: ${task.title}`);
   return [`PM generated wave: ${wave.goal}`, ...lines].join("\n");
 }
 
@@ -583,7 +583,7 @@ async function runWave(
   agents: ReturnType<typeof discoverAgents>["agents"],
   signal: AbortSignal,
 ): Promise<void> {
-  const tasks = wave.tasks.map(buildTaskState);
+  const tasks = (wave.tasks ?? []).map(buildTaskState);
   await runWaveWithTasks(pi, ctx, config, wave, tasks, agents, signal);
 }
 
@@ -648,11 +648,17 @@ async function generateWaveFromPm(
   ctx: ExtensionCommandContext,
   signal: AbortSignal,
   previousSummary: string,
+  errorMessage?: string,
 ): Promise<{ done: boolean; wave?: WorkflowWave; clarification?: string }> {
   const promptParts = [`Project goal: ${config.goal}`];
 
   if (previousSummary) {
     promptParts.push(`Previous wave summary:\n${previousSummary}`);
+  }
+
+  if (errorMessage) {
+    promptParts.push(`\nError from previous attempt: ${errorMessage}`);
+    promptParts.push("Please fix this and call generate_wave again with a valid wave object.");
   }
 
   promptParts.push(
@@ -686,6 +692,10 @@ async function generateWaveFromPm(
 
   if (output?.wave) {
     const wave = output.wave as WorkflowWave;
+    // Validate wave structure before using it
+    if (!wave.tasks || !Array.isArray(wave.tasks)) {
+      throw new Error("generate_wave returned invalid wave - \"tasks\" is missing or not an array");
+    }
     sendPmMessage(pi, summarizeWave(wave));
     return { done: false, wave };
   }
@@ -786,7 +796,7 @@ async function resumeWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext): P
         if (!wave) break;
 
         if (!tasks) {
-          tasks = wave.tasks.map(buildTaskState);
+          tasks = (wave.tasks ?? []).map(buildTaskState);
         }
 
         const updatedState: WorkflowState = {
@@ -896,18 +906,42 @@ async function startWorkflow(
             break;
           }
         } else {
-          const pmResult = await generateWaveFromPm(
-            pi,
-            effectiveConfig,
-            agents,
-            ctx,
-            abortController.signal,
-            previousSummary,
-          );
-          if (pmResult.done) {
+          // Retry PM call if it returns invalid output
+          const maxPmRetries = effectiveConfig.maxPmRetries ?? 3;
+          let pmResult: Awaited<ReturnType<typeof generateWaveFromPm>> | null = null;
+          let pmAttempts = 0;
+          let lastError: string | undefined;
+          while (pmAttempts < maxPmRetries) {
+            try {
+              pmResult = await generateWaveFromPm(
+                pi,
+                effectiveConfig,
+                agents,
+                ctx,
+                abortController.signal,
+                previousSummary,
+                lastError,
+              );
+              if (pmResult.done) {
+                break;
+              }
+              if (pmResult.wave) {
+                wave = pmResult.wave;
+                break;
+              }
+              // PM returned clarification - don't retry, just accept it
+              break;
+            } catch (error: any) {
+              // PM returned invalid wave - retry with error message
+              lastError = error.message;
+              pmAttempts++;
+              if (pmAttempts >= maxPmRetries) throw error;
+            }
+          }
+          if (pmResult?.done) {
             break;
           }
-          wave = pmResult.wave;
+          wave = pmResult?.wave ?? wave;
         }
 
         if (!wave) break;
@@ -1010,7 +1044,7 @@ export default function (pi: ExtensionAPI) {
     disposePmRunner();
     if (currentState) {
       currentState.active = false;
-      currentState.tasks = currentState.tasks.map((task) => {
+      currentState.tasks = (currentState.tasks ?? []).map((task) => {
         if (task.status === "in_progress") {
           return { ...task, status: "stopped", lastNote: "stopped" };
         }

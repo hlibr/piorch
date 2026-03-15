@@ -118,6 +118,8 @@ Agents report via structured tools instead of JSON text:
 
 **Tool isolation:** Each extension provides specific tools, and `allowedExtensionsByAgent` ensures agents only see their relevant tools.
 
+**PM wave validation:** If the PM returns a wave without a valid `tasks` array, the workflow automatically retries (up to `maxPmRetries` times from workflow config), passing the error message back to the PM so it can correct its output. This prevents crashes from malformed PM responses.
+
 ## Template variables
 
 In workflow JSON `inputTemplate`, you can reference:
