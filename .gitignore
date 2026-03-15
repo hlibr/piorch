@@ -2,3 +2,9 @@ node_modules
 .DS_Store
 .pnpm-store
 npm-debug.log
+
+# Coverage
+coverage/
+
+# Dependencies
+node_modules/
