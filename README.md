@@ -154,7 +154,6 @@ Edit `.pi/workflows/default.workflow.json` to customize:
 - **maxTaskRetries** - Retry limit per task (default: 2)
 - **allowedExtensions** - Whitelist extensions for all subagents
 - **allowedExtensionsByAgent** - Per-agent extension allowlists
-- **task requirements** - Optional `requirements` field passed only to verifier
 
 Example:
 
