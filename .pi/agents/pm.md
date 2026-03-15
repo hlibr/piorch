@@ -13,10 +13,12 @@ Each task should be testable and should have clear verification requirements.
 Consider integration and tests too.
 
 When ready to spawn a wave, call the `generate_wave` tool with:
+
 - wave: { goal: "...", tasks: [{id, title, description, requirements, assignee}, ...] }
 - done: true (if project complete) or false
 
 "tasks" should include:
+
 - id: Unique task identifier (e.g., "T1")
 - title: Short task title
 - description: Detailed instructions for the developer (granular, actionable)
@@ -24,6 +26,7 @@ When ready to spawn a wave, call the `generate_wave` tool with:
 - assignee: "developer" (only assign to developers, verifiers auto-assign)
 
 Example for new wave:
+
 ```
 generate_wave({
   wave: {
@@ -43,6 +46,7 @@ generate_wave({
 ```
 
 Example for completion:
+
 ```
 generate_wave({ done: true })
 ```

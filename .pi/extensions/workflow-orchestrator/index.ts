@@ -248,9 +248,7 @@ function resolveAllowedExtensions(
 ): string[] | undefined {
   // Try to find the role by matching agentName to config.agents values
   // This supports custom agent roles beyond pm/developer/verifier
-  const role = Object.entries(config.agents).find(
-    ([, name]) => name === agentName
-  )?.[0];
+  const role = Object.entries(config.agents).find(([, name]) => name === agentName)?.[0];
 
   if (role) {
     return (
@@ -507,8 +505,11 @@ async function processTask(
 
       if (stageId === "develop") {
         const summary =
-          typeof output?.summary === "string" ? output.summary :
-          (output === null ? result.outputText.split("\n")[0] ?? "completed" : JSON.stringify(output));
+          typeof output?.summary === "string"
+            ? output.summary
+            : output === null
+              ? (result.outputText.split("\n")[0] ?? "completed")
+              : JSON.stringify(output);
         sendAgentSummary(pi, t, stageId, summary);
       }
       if (stageId === "verify") {
@@ -669,15 +670,15 @@ async function generateWaveFromPm(
   signal: AbortSignal,
   previousSummary: string,
 ): Promise<{ done: boolean; wave?: WorkflowWave; clarification?: string }> {
-  const promptParts = [
-    `Project goal: ${config.goal}`,
-  ];
+  const promptParts = [`Project goal: ${config.goal}`];
 
   if (previousSummary) {
     promptParts.push(`Previous wave summary:\n${previousSummary}`);
   }
 
-  promptParts.push("Call the generate_wave tool with your response. If you need clarification from the user, respond conversationally instead.");
+  promptParts.push(
+    "Call the generate_wave tool with your response. If you need clarification from the user, respond conversationally instead.",
+  );
 
   const prompt = promptParts.join("\n\n");
   const outputText = await runPmAgent(pi, config, agents, ctx, signal, prompt);
@@ -703,7 +704,7 @@ async function generateWaveFromPm(
     sendPmMessage(pi, "PM reports: all work is complete.");
     return { done: true };
   }
-  
+
   if (output?.wave) {
     const wave = output.wave as WorkflowWave;
     sendPmMessage(pi, summarizeWave(wave));
@@ -1053,7 +1054,7 @@ export default function (pi: ExtensionAPI) {
       const { config } = loadWorkflowConfig(ctx.cwd, currentState.workflowName);
       const { agents } = discoverAgents(ctx.cwd);
       const effectiveConfig: WorkflowConfig = { ...config, goal: currentState.goal };
-      
+
       // If waiting for clarification, include that context
       const prompt = buildPmChatPrompt(currentState, event.text);
       const outputText = await runPmAgent(
@@ -1065,12 +1066,12 @@ export default function (pi: ExtensionAPI) {
         prompt,
       );
       sendPmMessage(pi, outputText);
-      
+
       // Clear the clarification flag - user has responded
       if (currentState.waitingForClarification) {
         setState(pi, ctx, { ...currentState, waitingForClarification: false });
       }
-      
+
       return { action: "handled" };
     } catch (error: any) {
       if (ctx.hasUI) ctx.ui.notify(error?.message || "PM chat failed", "error");

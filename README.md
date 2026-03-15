@@ -133,12 +133,13 @@ Agents have pre-configured models. Customize in `.pi/agents/*.md`:
 # .pi/agents/developer.md
 ---
 name: developer
-model: anthropic/claude-sonnet-4-5  # Your preferred model
+model: anthropic/claude-sonnet-4-5 # Your preferred model
 tools: read,edit,write,bash
 ---
 ```
 
 **Options:**
+
 1. **Use Pi's default model** - Remove the `model:` line
 2. **Use a specific model** - `anthropic/claude-sonnet-4-5`, `openai/gpt-4o`, `openrouter/deepseek-r1`, etc.
 3. **Use different models per agent** - Set different models for PM, developer, verifier
@@ -185,8 +186,8 @@ Edit `.pi/agents/*.md` to customize agent behavior:
 ---
 name: developer
 description: Implements assigned tasks
-model: anthropic/claude-sonnet-4-5  # Your preferred model (or remove to use Pi default)
-tools: read,edit,write,bash  # Built-in tools to enable
+model: anthropic/claude-sonnet-4-5 # Your preferred model (or remove to use Pi default)
+tools: read,edit,write,bash # Built-in tools to enable
 ---
 ```
 

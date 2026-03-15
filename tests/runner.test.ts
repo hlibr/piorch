@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Tests for tool call capture logic in RpcAgent.
- * 
+ *
  * These tests verify that tool calls are properly captured from RPC events.
  * The actual RPC communication is tested indirectly through the event parsing logic.
  */

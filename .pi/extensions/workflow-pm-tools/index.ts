@@ -7,7 +7,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
-export default function(pi: ExtensionAPI): void {
+export default function (pi: ExtensionAPI): void {
   pi.registerTool({
     name: "generate_wave",
     label: "Generate Wave",
@@ -16,16 +16,28 @@ export default function(pi: ExtensionAPI): void {
       done: Type.Boolean({
         description: "True if all work is complete, false if generating a new wave",
       }),
-      wave: Type.Optional(Type.Object({
-        goal: Type.String({ description: "Goal for this wave" }),
-        tasks: Type.Array(Type.Object({
-          id: Type.String({ description: "Unique task identifier" }),
-          title: Type.String({ description: "Short task title" }),
-          description: Type.String({ description: "Detailed instructions for developer" }),
-          requirements: Type.Optional(Type.String({ description: "Verification requirements for verifier" })),
-          assignee: Type.Optional(Type.String({ description: "Task assignee (default: developer)" })),
-        }), { description: "Tasks in this wave" }),
-      }, { description: "Wave details (required when done=false)" })),
+      wave: Type.Optional(
+        Type.Object(
+          {
+            goal: Type.String({ description: "Goal for this wave" }),
+            tasks: Type.Array(
+              Type.Object({
+                id: Type.String({ description: "Unique task identifier" }),
+                title: Type.String({ description: "Short task title" }),
+                description: Type.String({ description: "Detailed instructions for developer" }),
+                requirements: Type.Optional(
+                  Type.String({ description: "Verification requirements for verifier" }),
+                ),
+                assignee: Type.Optional(
+                  Type.String({ description: "Task assignee (default: developer)" }),
+                ),
+              }),
+              { description: "Tasks in this wave" },
+            ),
+          },
+          { description: "Wave details (required when done=false)" },
+        ),
+      ),
     }),
     async execute(_toolCallId, params) {
       if (params.done) {
@@ -44,7 +56,9 @@ export default function(pi: ExtensionAPI): void {
 
       const taskCount = params.wave.tasks.length;
       return {
-        content: [{ type: "text", text: `Wave generated: "${params.wave.goal}" (${taskCount} tasks)` }],
+        content: [
+          { type: "text", text: `Wave generated: "${params.wave.goal}" (${taskCount} tasks)` },
+        ],
         details: { params },
       };
     },

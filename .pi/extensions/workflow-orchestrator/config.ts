@@ -37,15 +37,9 @@ const WaveSourceSchema = Type.Object({
   staticWaves: Type.Optional(Type.Array(WaveSchema)),
 });
 
-const AllowedExtensionsByAgentSchema = Type.Record(
-  Type.String(),
-  Type.Array(Type.String())
-);
+const AllowedExtensionsByAgentSchema = Type.Record(Type.String(), Type.Array(Type.String()));
 
-const AgentsSchema = Type.Record(
-  Type.String(),
-  Type.String()
-);
+const AgentsSchema = Type.Record(Type.String(), Type.String());
 
 const WorkflowSchema = Type.Object({
   name: Type.String(),

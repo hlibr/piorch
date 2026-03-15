@@ -58,12 +58,14 @@ Session files are JSONL (one JSON event per line):
 ```
 
 **Key event types:**
+
 - `prompt` - The prompt sent to the agent
 - `message_end` - Agent's text response
 - `tool_execution_start` - Tool call with arguments (this is captured for structured output)
 - `agent_end` - Agent completed
 
 **Locations:**
+
 - PM sessions: `.pi/workflows/sessions/pm-<workflow>.jsonl`
 - Task sessions: `.pi/workflows/sessions/<runId>/<taskId>-<stageId>.jsonl`
 
@@ -104,11 +106,11 @@ use `allowedExtensionsByAgent` to set per-agent allowlists:
 
 Agents report via structured tools instead of JSON text:
 
-| Agent | Tool | Purpose |
-|-------|------|---------|
-| PM | `generate_wave` | Report new wave or project completion |
-| Developer | `report_task_result` | Report task done with files/summary |
-| Verifier | `report_task_result` | Report pass/fail with issues |
+| Agent     | Tool                 | Purpose                               |
+| --------- | -------------------- | ------------------------------------- |
+| PM        | `generate_wave`      | Report new wave or project completion |
+| Developer | `report_task_result` | Report task done with files/summary   |
+| Verifier  | `report_task_result` | Report pass/fail with issues          |
 
 **Why tools?** Previously, agents output JSON text that was parsed with `extractJson()`. Malformed JSON caused silent failures where verifier reports were lost. Tools provide structured arguments that are captured directly from `tool_execution_start` events.
 
@@ -120,18 +122,19 @@ Agents report via structured tools instead of JSON text:
 
 In workflow JSON `inputTemplate`, you can reference:
 
-| Variable | Description |
-|----------|-------------|
-| `{{task.title}}` | Task title |
-| `{{task.description}}` | Task description |
-| `{{task.requirements}}` | Verification requirements |
-| `{{task.issues}}` | Current issues (from previous failures) |
-| `{{task.stageOutputs.<stageId>}}` | Output from a previous stage |
-| `{{workflow.goal}}` | Project goal |
-| `{{wave.goal}}` | Current wave goal |
-| `{{wave.index}}` | Wave number (0-based) |
+| Variable                          | Description                             |
+| --------------------------------- | --------------------------------------- |
+| `{{task.title}}`                  | Task title                              |
+| `{{task.description}}`            | Task description                        |
+| `{{task.requirements}}`           | Verification requirements               |
+| `{{task.issues}}`                 | Current issues (from previous failures) |
+| `{{task.stageOutputs.<stageId>}}` | Output from a previous stage            |
+| `{{workflow.goal}}`               | Project goal                            |
+| `{{wave.goal}}`                   | Current wave goal                       |
+| `{{wave.index}}`                  | Wave number (0-based)                   |
 
 **Example:**
+
 ```json
 "inputTemplate": "Verify task {{task.title}}.\nDev summary: {{task.stageOutputs.develop.summary}}"
 ```
