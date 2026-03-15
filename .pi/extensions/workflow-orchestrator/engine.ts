@@ -102,6 +102,10 @@ export async function runTaskFlow<TTask extends { retries: number }, TOutput>(
           break;
         }
       }
+      // If no transition matched (e.g., status is "unknown" or missing), retry verifier
+      if (!nextStageId && stage.id === "verify") {
+        nextStageId = stage.id; // Stay in verify stage
+      }
     } else {
       nextStageId = getNextStageId(input.stages, stage.id);
     }

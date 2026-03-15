@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/1113</span>
+                <span class='fraction'>0/1094</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/1113</span>
+                <span class='fraction'>0/1094</span>
             </div>
         
             
@@ -1325,28 +1325,7 @@
 <a name='L1260'></a><a href='#L1260'>1260</a>
 <a name='L1261'></a><a href='#L1261'>1261</a>
 <a name='L1262'></a><a href='#L1262'>1262</a>
-<a name='L1263'></a><a href='#L1263'>1263</a>
-<a name='L1264'></a><a href='#L1264'>1264</a>
-<a name='L1265'></a><a href='#L1265'>1265</a>
-<a name='L1266'></a><a href='#L1266'>1266</a>
-<a name='L1267'></a><a href='#L1267'>1267</a>
-<a name='L1268'></a><a href='#L1268'>1268</a>
-<a name='L1269'></a><a href='#L1269'>1269</a>
-<a name='L1270'></a><a href='#L1270'>1270</a>
-<a name='L1271'></a><a href='#L1271'>1271</a>
-<a name='L1272'></a><a href='#L1272'>1272</a>
-<a name='L1273'></a><a href='#L1273'>1273</a>
-<a name='L1274'></a><a href='#L1274'>1274</a>
-<a name='L1275'></a><a href='#L1275'>1275</a>
-<a name='L1276'></a><a href='#L1276'>1276</a>
-<a name='L1277'></a><a href='#L1277'>1277</a>
-<a name='L1278'></a><a href='#L1278'>1278</a>
-<a name='L1279'></a><a href='#L1279'>1279</a>
-<a name='L1280'></a><a href='#L1280'>1280</a>
-<a name='L1281'></a><a href='#L1281'>1281</a>
-<a name='L1282'></a><a href='#L1282'>1282</a>
-<a name='L1283'></a><a href='#L1283'>1283</a>
-<a name='L1284'></a><a href='#L1284'>1284</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L1263'></a><a href='#L1263'>1263</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1362,6 +1341,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -1420,28 +1400,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -2650,6 +2608,7 @@ import {
 <span class="cstat-no" title="statement not covered" >import { setPmWidgetStatus, setTaskListExpanded, updateStatus } from "./render.js";</span>
 <span class="cstat-no" title="statement not covered" >import { RpcAgent } from "./runner.js";</span>
 <span class="cstat-no" title="statement not covered" >import { appendState, restoreState, type TaskState, type WorkflowState } from "./state.js";</span>
+<span class="cstat-no" title="statement not covered" >import { extractJson, normalizeGoal } from "./utils.js";</span>
 &nbsp;
 interface WorkflowRunHandle {
   abortController: AbortController;
@@ -2710,28 +2669,6 @@ interface TaskRunner {
 <span class="cstat-no" title="statement not covered" >    if (Array.isArray(value)) return value.join("\n");</span>
 <span class="cstat-no" title="statement not covered" >    return String(value);</span>
 <span class="cstat-no" title="statement not covered" >  });</span>
-<span class="cstat-no" title="statement not covered" >}</span>
-&nbsp;
-<span class="cstat-no" title="statement not covered" >function extractJson(text: string): any {</span>
-<span class="cstat-no" title="statement not covered" >  const cleaned = text.replace(/```[\s\S]*?```/g, (block) =&gt; block.replace(/```/g, ""));</span>
-<span class="cstat-no" title="statement not covered" >  const start = cleaned.indexOf("{");</span>
-<span class="cstat-no" title="statement not covered" >  const end = cleaned.lastIndexOf("}");</span>
-<span class="cstat-no" title="statement not covered" >  if (start === -1 || end === -1 || end &lt;= start) throw new Error("No JSON object found");</span>
-<span class="cstat-no" title="statement not covered" >  const jsonText = cleaned.slice(start, end + 1);</span>
-<span class="cstat-no" title="statement not covered" >  return JSON.parse(jsonText);</span>
-<span class="cstat-no" title="statement not covered" >}</span>
-&nbsp;
-<span class="cstat-no" title="statement not covered" >function normalizeGoal(goal?: string): string | undefined {</span>
-<span class="cstat-no" title="statement not covered" >  if (!goal) return undefined;</span>
-<span class="cstat-no" title="statement not covered" >  const trimmed = goal.trim();</span>
-<span class="cstat-no" title="statement not covered" >  if (!trimmed) return undefined;</span>
-<span class="cstat-no" title="statement not covered" >  if (</span>
-<span class="cstat-no" title="statement not covered" >    (trimmed.startsWith('"') &amp;&amp; trimmed.endsWith('"')) ||</span>
-<span class="cstat-no" title="statement not covered" >    (trimmed.startsWith("'") &amp;&amp; trimmed.endsWith("'"))</span>
-<span class="cstat-no" title="statement not covered" >  ) {</span>
-<span class="cstat-no" title="statement not covered" >    return trimmed.slice(1, -1).trim();</span>
-<span class="cstat-no" title="statement not covered" >  }</span>
-<span class="cstat-no" title="statement not covered" >  return trimmed;</span>
 <span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >const MAX_TICKER_CHARS = 160;</span>
@@ -3919,7 +3856,7 @@ interface TaskRunner {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-15T13:04:13.637Z
+                at 2026-03-15T13:16:04.888Z
             </div>
         <script src="../prettify.js"></script>
         <script>

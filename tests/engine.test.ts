@@ -117,4 +117,22 @@ describe("runTaskFlow", () => {
     });
     expect(calls).toBe(0);
   });
+
+  it("retries verifier when status is unknown", async () => {
+    const task: TestTask = { id: "T1", status: "pending", retries: 0 };
+    let verifyCount = 0;
+    await runTaskFlow({
+      ...baseOptions(task),
+      runStage: async (stage) => {
+        if (stage.id === "develop") return { output: { status: "done" }, outputText: "dev" };
+        verifyCount += 1;
+        if (verifyCount === 1)
+          return { output: { status: "unknown" }, outputText: "verifier failed to parse" };
+        return { output: { status: "pass", issues: [] }, outputText: "verify" };
+      },
+    });
+    expect(verifyCount).toBe(2);
+    // Note: retries counter is for dev→verify loops, not verify retries
+    expect(task.status).toBe("verified");
+  });
 });
