@@ -670,11 +670,17 @@ async function generateWaveFromPm(
   signal: AbortSignal,
   previousSummary: string,
 ): Promise<{ done: boolean; wave?: WorkflowWave }> {
-  const prompt = [
+  const promptParts = [
     `Project goal: ${config.goal}`,
-    previousSummary ? `Previous wave summary:\n${previousSummary}` : "No previous wave summary.",
-    "Call the generate_wave tool with your response.",
-  ].join("\n\n");
+  ];
+  
+  if (previousSummary) {
+    promptParts.push(`Previous wave summary:\n${previousSummary}`);
+  }
+  
+  promptParts.push("Call the generate_wave tool with your response.");
+  
+  const prompt = promptParts.join("\n\n");
 
   const outputText = await runPmAgent(pi, config, agents, ctx, signal, prompt);
 
