@@ -245,20 +245,18 @@ function resolveAllowedExtensions(
   agentName: string,
   config: WorkflowConfig,
   state?: WorkflowState,
+  stageId?: string,
 ): string[] | undefined {
-  const role =
-    agentName === config.agents.pm
-      ? "pm"
-      : agentName === config.agents.developer
-        ? "developer"
-        : agentName === config.agents.verifier
-          ? "verifier"
-          : undefined;
+  // Try to find the role by matching agentName to config.agents values
+  // This supports custom agent roles beyond pm/developer/verifier
+  const role = Object.entries(config.agents).find(
+    ([, name]) => name === agentName
+  )?.[0];
 
   if (role) {
     return (
-      state?.allowedExtensionsByAgent?.[role] ??
-      config.allowedExtensionsByAgent?.[role] ??
+      state?.allowedExtensionsByAgent?.[role as keyof typeof state.allowedExtensionsByAgent] ??
+      config.allowedExtensionsByAgent?.[role as keyof typeof config.allowedExtensionsByAgent] ??
       state?.allowedExtensions ??
       config.allowedExtensions
     );
@@ -298,7 +296,7 @@ function getTaskRunner(
     systemPrompt: agent.systemPrompt,
     model: agent.model,
     tools: agent.tools,
-    allowedExtensions: resolveAllowedExtensions(agentName, config, currentState),
+    allowedExtensions: resolveAllowedExtensions(agentName, config, currentState, stage.id),
   });
 
   const taskRunner: TaskRunner = { key, agent: runner, stageId: stage.id };
