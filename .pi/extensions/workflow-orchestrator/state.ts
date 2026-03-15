@@ -8,8 +8,7 @@ export interface TaskState extends WorkflowTask {
   stageId?: string;
   retries: number;
   issues?: string[];
-  devOutput?: Record<string, unknown>;
-  verifyOutput?: Record<string, unknown>;
+  stageOutputs?: Record<string, Record<string, unknown>>;
   lastAgent?: string;
   lastNote?: string;
   lastOutput?: string;

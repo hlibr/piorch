@@ -168,8 +168,9 @@ function buildWaveSummary(state: WorkflowState): string {
       task.status === "verified" ? "verified" : task.status === "failed" ? "failed" : task.status;
     const note = task.lastNote ? ` — ${task.lastNote}` : "";
     const issues = task.issues?.length ? ` issues: ${task.issues.join("; ")}` : "";
-    const filesChanged = Array.isArray((task.devOutput as any)?.filesChanged)
-      ? ` files: ${(task.devOutput as any).filesChanged.join(", ")}`
+    const devOutput = task.stageOutputs?.["develop"];
+    const filesChanged = Array.isArray(devOutput?.filesChanged)
+      ? ` files: ${devOutput.filesChanged.join(", ")}`
       : "";
     return `${task.id}: ${task.title} (${status})${note}${issues}${filesChanged}`;
   });
@@ -416,8 +417,7 @@ async function processTask(
       const templateData = {
         task: {
           ...t,
-          dev: t.devOutput,
-          verify: t.verifyOutput,
+          stageOutputs: t.stageOutputs ?? {},
           issues: t.issues,
         },
         workflow: { goal: config.goal },
@@ -478,17 +478,19 @@ async function processTask(
       if (!currentState) return; // Guard against workflow stop during execution
 
       const output = result.output;
-      
+
+      // Initialize stageOutputs if needed
+      if (!t.stageOutputs) t.stageOutputs = {};
+
       // Fallback: if output is null but we have text, use the text as summary
       if (output === null && result.outputText) {
         const textSummary = result.outputText.split("\n").slice(0, 3).join(" ").trim();
         if (stageId === "develop") {
-          t.devOutput = { summary: textSummary, filesChanged: [] };
+          t.stageOutputs[stageId] = { summary: textSummary, filesChanged: [] };
         }
         t.lastNote = textSummary.slice(0, 80);
       } else {
-        if (stageId === "develop") t.devOutput = output;
-        if (stageId === "verify") t.verifyOutput = output;
+        t.stageOutputs[stageId] = output;
 
         if (typeof output?.status === "string") {
           t.lastNote = String(output.status);
@@ -508,7 +510,7 @@ async function processTask(
 
       if (stageId === "develop") {
         const summary =
-          typeof output?.summary === "string" ? output.summary : 
+          typeof output?.summary === "string" ? output.summary :
           (output === null ? result.outputText.split("\n")[0] ?? "completed" : JSON.stringify(output));
         sendAgentSummary(pi, t, stageId, summary);
       }
@@ -528,11 +530,12 @@ async function processTask(
 
       setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
     },
-    applyVerifyFailure: (t, _stageId, result, errorMessage) => {
+    applyVerifyFailure: (t, stageId, result, errorMessage) => {
       if (!currentState) return false; // Guard against workflow stop during execution
       const output = result?.output;
       const issues = output?.issues ?? (errorMessage ? [errorMessage] : []);
-      t.verifyOutput = { status: "fail", issues };
+      if (!t.stageOutputs) t.stageOutputs = {};
+      t.stageOutputs[stageId] = { status: "fail", issues };
       t.issues = Array.isArray(issues) ? issues.map(String) : [String(issues)];
       t.retries += 1;
       t.lastNote = errorMessage ? `error: ${errorMessage}` : "fail";
