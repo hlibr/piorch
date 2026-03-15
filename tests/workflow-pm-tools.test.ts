@@ -188,12 +188,14 @@ describe("workflow-pm-tools extension", () => {
 
       const wave = {
         goal: "Big wave",
-        tasks: Array(5).fill(null).map((_, i) => ({
-          id: `T${i + 1}`,
-          title: `Task ${i + 1}`,
-          description: `Description ${i + 1}`,
-          assignee: "developer",
-        })),
+        tasks: Array(5)
+          .fill(null)
+          .map((_, i) => ({
+            id: `T${i + 1}`,
+            title: `Task ${i + 1}`,
+            description: `Description ${i + 1}`,
+            assignee: "developer",
+          })),
       };
 
       const result = await registeredTool.execute(
@@ -248,7 +250,13 @@ describe("workflow-pm-tools extension", () => {
       // When done=true, wave is not required
       // This is tested by the execute function accepting {done: true}
       expect(() => {
-        registeredTool.execute("id", { done: true }, vi.fn(), {} as any, new AbortController().signal);
+        registeredTool.execute(
+          "id",
+          { done: true },
+          vi.fn(),
+          {} as any,
+          new AbortController().signal,
+        );
       }).not.toThrow();
     });
 

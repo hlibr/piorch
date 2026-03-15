@@ -98,9 +98,9 @@ describe("render.ts", () => {
     it("collapses task list", () => {
       setTaskListExpanded(false);
       const state = createBaseState({
-        tasks: Array(5).fill(null).map((_, i) =>
-          createTask({ id: `T${i + 1}`, title: `Task ${i + 1}` }),
-        ),
+        tasks: Array(5)
+          .fill(null)
+          .map((_, i) => createTask({ id: `T${i + 1}`, title: `Task ${i + 1}` })),
       });
       updateStatus(mockCtx, state);
 
@@ -141,18 +141,12 @@ describe("render.ts", () => {
 
       updateStatus(mockCtx, state);
 
-      expect(mockUi.setStatus).toHaveBeenCalledWith(
-        "workflow",
-        "Wave 3: 2/4 verified, 1 failed",
-      );
+      expect(mockUi.setStatus).toHaveBeenCalledWith("workflow", "Wave 3: 2/4 verified, 1 failed");
     });
 
     it("shows all tasks verified", () => {
       const state = createBaseState({
-        tasks: [
-          createTask({ status: "verified" }),
-          createTask({ status: "verified" }),
-        ],
+        tasks: [createTask({ status: "verified" }), createTask({ status: "verified" })],
       });
 
       updateStatus(mockCtx, state);
@@ -361,9 +355,11 @@ describe("render.ts", () => {
     it("limits tasks when collapsed", () => {
       setTaskListExpanded(false);
       const state = createBaseState({
-        tasks: Array(10).fill(null).map((_, i) =>
-          createTask({ id: `T${i + 1}`, title: `Task ${i + 1}`, status: "pending" }),
-        ),
+        tasks: Array(10)
+          .fill(null)
+          .map((_, i) =>
+            createTask({ id: `T${i + 1}`, title: `Task ${i + 1}`, status: "pending" }),
+          ),
       });
 
       updateStatus(mockCtx, state);
@@ -379,9 +375,11 @@ describe("render.ts", () => {
     it("shows more tasks when expanded", () => {
       setTaskListExpanded(true);
       const state = createBaseState({
-        tasks: Array(10).fill(null).map((_, i) =>
-          createTask({ id: `T${i + 1}`, title: `Task ${i + 1}`, status: "pending" }),
-        ),
+        tasks: Array(10)
+          .fill(null)
+          .map((_, i) =>
+            createTask({ id: `T${i + 1}`, title: `Task ${i + 1}`, status: "pending" }),
+          ),
       });
 
       updateStatus(mockCtx, state);
@@ -401,7 +399,8 @@ describe("render.ts", () => {
           createTask({
             id: "T1",
             status: "pending",
-            title: "This is a very long task title that should be truncated to fit within the maximum width allowed",
+            title:
+              "This is a very long task title that should be truncated to fit within the maximum width allowed",
           }),
         ],
       });

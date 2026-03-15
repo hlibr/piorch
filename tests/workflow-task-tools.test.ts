@@ -316,7 +316,7 @@ describe("workflow-task-tools extension", () => {
         "tool-call-123",
         {
           status: "done",
-          summary: "Created file with\nnewlines and \"quotes\"",
+          summary: 'Created file with\nnewlines and "quotes"',
         },
         vi.fn(),
         {} as any,

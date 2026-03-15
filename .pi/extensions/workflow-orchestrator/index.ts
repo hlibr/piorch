@@ -694,7 +694,7 @@ async function generateWaveFromPm(
     const wave = output.wave as WorkflowWave;
     // Validate wave structure before using it
     if (!wave.tasks || !Array.isArray(wave.tasks)) {
-      throw new Error("generate_wave returned invalid wave - \"tasks\" is missing or not an array");
+      throw new Error('generate_wave returned invalid wave - "tasks" is missing or not an array');
     }
     sendPmMessage(pi, summarizeWave(wave));
     return { done: false, wave };

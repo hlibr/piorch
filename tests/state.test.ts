@@ -60,12 +60,15 @@ describe("state.ts", () => {
 
       appendState(mockPi, state);
 
-      expect(mockPi.appendEntry).toHaveBeenCalledWith(STATE_TYPE, expect.objectContaining({
-        tasks: expect.arrayContaining([
-          expect.objectContaining({ id: "T1" }),
-          expect.objectContaining({ id: "T2" }),
-        ]),
-      }));
+      expect(mockPi.appendEntry).toHaveBeenCalledWith(
+        STATE_TYPE,
+        expect.objectContaining({
+          tasks: expect.arrayContaining([
+            expect.objectContaining({ id: "T1" }),
+            expect.objectContaining({ id: "T2" }),
+          ]),
+        }),
+      );
     });
 
     it("appends state with allowedExtensions", () => {
@@ -298,9 +301,9 @@ describe("state.ts", () => {
 
       const mockCtx = {
         sessionManager: {
-          getBranch: vi.fn().mockReturnValue([
-            { type: "custom", customType: STATE_TYPE, data: complexState },
-          ]),
+          getBranch: vi
+            .fn()
+            .mockReturnValue([{ type: "custom", customType: STATE_TYPE, data: complexState }]),
         },
       } as unknown as ExtensionContext;
 
@@ -327,9 +330,9 @@ describe("state.ts", () => {
 
       const mockCtx = {
         sessionManager: {
-          getBranch: vi.fn().mockReturnValue([
-            { type: "custom", customType: STATE_TYPE, data: stateWithResume },
-          ]),
+          getBranch: vi
+            .fn()
+            .mockReturnValue([{ type: "custom", customType: STATE_TYPE, data: stateWithResume }]),
         },
       } as unknown as ExtensionContext;
 
@@ -352,9 +355,9 @@ describe("state.ts", () => {
 
       const mockCtx = {
         sessionManager: {
-          getBranch: vi.fn().mockReturnValue([
-            { type: "custom", customType: STATE_TYPE, data: stateWithOutput },
-          ]),
+          getBranch: vi
+            .fn()
+            .mockReturnValue([{ type: "custom", customType: STATE_TYPE, data: stateWithOutput }]),
         },
       } as unknown as ExtensionContext;
 

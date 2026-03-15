@@ -25,11 +25,7 @@ describe("agents.ts", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  function createAgentFile(
-    dir: string,
-    name: string,
-    content: string,
-  ): string {
+  function createAgentFile(dir: string, name: string, content: string): string {
     const filePath = path.join(dir, `${name}.md`);
     fs.writeFileSync(filePath, content, "utf-8");
     return filePath;
