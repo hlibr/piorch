@@ -34,6 +34,7 @@ export interface WorkflowState {
   };
   previousSummary?: string;
   waveSummaries?: string[];
+  waitingForClarification?: boolean;
 }
 
 export const STATE_TYPE = "workflow-state";

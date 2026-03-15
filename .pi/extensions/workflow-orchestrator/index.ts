@@ -669,19 +669,18 @@ async function generateWaveFromPm(
   ctx: ExtensionCommandContext,
   signal: AbortSignal,
   previousSummary: string,
-): Promise<{ done: boolean; wave?: WorkflowWave }> {
+): Promise<{ done: boolean; wave?: WorkflowWave; clarification?: string }> {
   const promptParts = [
     `Project goal: ${config.goal}`,
   ];
-  
+
   if (previousSummary) {
     promptParts.push(`Previous wave summary:\n${previousSummary}`);
   }
-  
-  promptParts.push("Call the generate_wave tool with your response.");
-  
-  const prompt = promptParts.join("\n\n");
 
+  promptParts.push("Call the generate_wave tool with your response. If you need clarification from the user, respond conversationally instead.");
+
+  const prompt = promptParts.join("\n\n");
   const outputText = await runPmAgent(pi, config, agents, ctx, signal, prompt);
 
   // Get tool calls from PM runner - prefer structured tool output
@@ -693,18 +692,32 @@ async function generateWaveFromPm(
   if (waveCall) {
     output = waveCall.arguments as Record<string, unknown>;
   } else {
-    // Fallback to JSON parsing for backward compatibility
-    output = extractJson(outputText || "");
+    // Try JSON parsing for backward compatibility
+    try {
+      output = extractJson(outputText || "");
+    } catch {
+      output = null;
+    }
   }
 
-  if (output.done === true) {
+  if (output?.done === true) {
     sendPmMessage(pi, "PM reports: all work is complete.");
     return { done: true };
   }
-  if (!output.wave) throw new Error("PM output missing wave");
-  const wave = output.wave as WorkflowWave;
-  sendPmMessage(pi, summarizeWave(wave));
-  return { done: false, wave };
+  
+  if (output?.wave) {
+    const wave = output.wave as WorkflowWave;
+    sendPmMessage(pi, summarizeWave(wave));
+    return { done: false, wave };
+  }
+
+  // PM didn't call tool or return JSON - treat as clarification request
+  if (outputText && outputText.trim()) {
+    sendPmMessage(pi, outputText);
+    return { done: false, clarification: outputText };
+  }
+
+  throw new Error("PM output missing wave");
 }
 
 async function resumeWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext): Promise<void> {
@@ -759,6 +772,34 @@ async function resumeWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext): P
           );
           if (pmResult.done) {
             break;
+          }
+          if (pmResult.clarification) {
+            // PM needs clarification - pause and wait for user response
+            sendWorkflowNotice(pi, "PM is waiting for your response...");
+            // Set a flag that we're waiting for clarification
+            const waitingState: WorkflowState = {
+              ...currentState!,
+              waveIndex,
+              wave: undefined,
+              tasks: [],
+              updatedAt: Date.now(),
+              previousSummary,
+              waveSummaries: currentState?.waveSummaries ?? [],
+              active: true,
+              waitingForClarification: true,
+            };
+            setState(pi, ctx, waitingState);
+            // Pause the workflow loop - user will respond via PM chat
+            await new Promise<void>((resolve) => {
+              const checkInterval = setInterval(() => {
+                if (!currentState?.waitingForClarification || abortController.signal.aborted) {
+                  clearInterval(checkInterval);
+                  resolve();
+                }
+              }, 500);
+            });
+            // User responded, PM should have processed it - retry wave generation
+            continue;
           }
           wave = pmResult.wave;
         }
@@ -1013,6 +1054,8 @@ export default function (pi: ExtensionAPI) {
       const { config } = loadWorkflowConfig(ctx.cwd, currentState.workflowName);
       const { agents } = discoverAgents(ctx.cwd);
       const effectiveConfig: WorkflowConfig = { ...config, goal: currentState.goal };
+      
+      // If waiting for clarification, include that context
       const prompt = buildPmChatPrompt(currentState, event.text);
       const outputText = await runPmAgent(
         pi,
@@ -1023,6 +1066,12 @@ export default function (pi: ExtensionAPI) {
         prompt,
       );
       sendPmMessage(pi, outputText);
+      
+      // Clear the clarification flag - user has responded
+      if (currentState.waitingForClarification) {
+        setState(pi, ctx, { ...currentState, waitingForClarification: false });
+      }
+      
       return { action: "handled" };
     } catch (error: any) {
       if (ctx.hasUI) ctx.ui.notify(error?.message || "PM chat failed", "error");
