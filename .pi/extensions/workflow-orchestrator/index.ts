@@ -478,15 +478,25 @@ async function processTask(
       if (!currentState) return; // Guard against workflow stop during execution
 
       const output = result.output;
-      if (stageId === "develop") t.devOutput = output;
-      if (stageId === "verify") t.verifyOutput = output;
-
-      if (typeof output?.status === "string") {
-        t.lastNote = String(output.status);
-      } else if (typeof output?.summary === "string") {
-        t.lastNote = output.summary.slice(0, 80);
+      
+      // Fallback: if output is null but we have text, use the text as summary
+      if (output === null && result.outputText) {
+        const textSummary = result.outputText.split("\n").slice(0, 3).join(" ").trim();
+        if (stageId === "develop") {
+          t.devOutput = { summary: textSummary, filesChanged: [] };
+        }
+        t.lastNote = textSummary.slice(0, 80);
       } else {
-        t.lastNote = "completed";
+        if (stageId === "develop") t.devOutput = output;
+        if (stageId === "verify") t.verifyOutput = output;
+
+        if (typeof output?.status === "string") {
+          t.lastNote = String(output.status);
+        } else if (typeof output?.summary === "string") {
+          t.lastNote = output.summary.slice(0, 80);
+        } else {
+          t.lastNote = "completed";
+        }
       }
 
       const tickerSource =
@@ -498,7 +508,8 @@ async function processTask(
 
       if (stageId === "develop") {
         const summary =
-          typeof output?.summary === "string" ? output.summary : JSON.stringify(output);
+          typeof output?.summary === "string" ? output.summary : 
+          (output === null ? result.outputText.split("\n")[0] ?? "completed" : JSON.stringify(output));
         sendAgentSummary(pi, t, stageId, summary);
       }
       if (stageId === "verify") {
