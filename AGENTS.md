@@ -112,4 +112,26 @@ Agents report via structured tools instead of JSON text:
 
 **Why tools?** Previously, agents output JSON text that was parsed with `extractJson()`. Malformed JSON caused silent failures where verifier reports were lost. Tools provide structured arguments that are captured directly from `tool_execution_start` events.
 
+**Fallback:** If an agent doesn't call the tool, their text output is captured and stored in `stageOutputs[stageId]`. This ensures workflow continuity.
+
 **Tool isolation:** Each extension provides specific tools, and `allowedExtensionsByAgent` ensures agents only see their relevant tools.
+
+## Template variables
+
+In workflow JSON `inputTemplate`, you can reference:
+
+| Variable | Description |
+|----------|-------------|
+| `{{task.title}}` | Task title |
+| `{{task.description}}` | Task description |
+| `{{task.requirements}}` | Verification requirements |
+| `{{task.issues}}` | Current issues (from previous failures) |
+| `{{task.stageOutputs.<stageId>}}` | Output from a previous stage |
+| `{{workflow.goal}}` | Project goal |
+| `{{wave.goal}}` | Current wave goal |
+| `{{wave.index}}` | Wave number (0-based) |
+
+**Example:**
+```json
+"inputTemplate": "Verify task {{task.title}}.\nDev summary: {{task.stageOutputs.develop.summary}}"
+```

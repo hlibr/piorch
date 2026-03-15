@@ -238,6 +238,8 @@ Agents report results via structured tools instead of JSON text:
 
 This eliminates JSON parsing failures that previously caused silent verifier report losses.
 
+**Fallback:** If an agent forgets to call the tool, their text output is captured and used as a summary. This ensures the workflow continues even with non-compliant agents.
+
 Tools are provided by separate extensions:
 - `workflow-pm-tools` → `generate_wave` (PM only)
 - `workflow-task-tools` → `report_task_result` (developer/verifier)
