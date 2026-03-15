@@ -245,7 +245,7 @@ function resolveAllowedExtensions(
   agentName: string,
   config: WorkflowConfig,
   state?: WorkflowState,
-  stageId?: string,
+  _stageId?: string,
 ): string[] | undefined {
   // Try to find the role by matching agentName to config.agents values
   // This supports custom agent roles beyond pm/developer/verifier
