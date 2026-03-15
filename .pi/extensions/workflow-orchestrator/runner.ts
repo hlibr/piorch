@@ -391,6 +391,8 @@ export class RpcAgent {
         } else if (part.type === "text") {
           run.lastAssistantText = part.text;
         } else if (part.type === "toolCall") {
+          // Capture tool call from message content
+          run.toolCalls.push({ name: part.name, arguments: part.arguments });
           run.onUpdate?.({
             type: "tool_start",
             toolName: part.name,
