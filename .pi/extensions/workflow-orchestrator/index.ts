@@ -245,7 +245,6 @@ function resolveAllowedExtensions(
   agentName: string,
   config: WorkflowConfig,
   state?: WorkflowState,
-  _stageId?: string,
 ): string[] | undefined {
   // Try to find the role by matching agentName to config.agents values
   // This supports custom agent roles beyond pm/developer/verifier
@@ -296,7 +295,7 @@ function getTaskRunner(
     systemPrompt: agent.systemPrompt,
     model: agent.model,
     tools: agent.tools,
-    allowedExtensions: resolveAllowedExtensions(agentName, config, currentState, stage.id),
+    allowedExtensions: resolveAllowedExtensions(agentName, config, currentState),
   });
 
   const taskRunner: TaskRunner = { key, agent: runner, stageId: stage.id };
