@@ -185,13 +185,13 @@ Edit `.pi/agents/*.md` to customize agent behavior:
 ---
 name: developer
 description: Implements assigned tasks
-model: gpt-5.4 # Required: change this placeholder
-tools: read,edit,write,bash # Optional: limit available tools
+model: anthropic/claude-sonnet-4-5  # Your preferred model (or remove to use Pi default)
+tools: read,edit,write,bash  # Built-in tools to enable
 ---
 ```
 
 **System prompt:**
-The markdown body becomes the agent's system prompt. Customize it to change behavior
+The markdown body becomes the agent's system prompt. Customize it to change behavior.
 
 ### Custom Model Providers (Optional)
 
