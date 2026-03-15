@@ -19,6 +19,7 @@ import { runTaskFlow } from "./engine.js";
 import { setPmWidgetStatus, setTaskListExpanded, updateStatus } from "./render.js";
 import { RpcAgent } from "./runner.js";
 import { appendState, restoreState, type TaskState, type WorkflowState } from "./state.js";
+import { extractJson, normalizeGoal } from "./utils.js";
 
 interface WorkflowRunHandle {
   abortController: AbortController;
@@ -79,28 +80,6 @@ function renderTemplate(template: string, data: Record<string, unknown>): string
     if (Array.isArray(value)) return value.join("\n");
     return String(value);
   });
-}
-
-function extractJson(text: string): any {
-  const cleaned = text.replace(/```[\s\S]*?```/g, (block) => block.replace(/```/g, ""));
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) throw new Error("No JSON object found");
-  const jsonText = cleaned.slice(start, end + 1);
-  return JSON.parse(jsonText);
-}
-
-function normalizeGoal(goal?: string): string | undefined {
-  if (!goal) return undefined;
-  const trimmed = goal.trim();
-  if (!trimmed) return undefined;
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-  ) {
-    return trimmed.slice(1, -1).trim();
-  }
-  return trimmed;
 }
 
 const MAX_TICKER_CHARS = 160;
