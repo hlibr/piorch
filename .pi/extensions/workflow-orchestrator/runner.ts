@@ -22,11 +22,17 @@ export interface AgentRunInput {
   allowedExtensions?: string[];
 }
 
+export interface ToolCallCapture {
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
 export interface AgentRunResult {
   outputText: string;
   messages: Message[];
   stderr: string;
   exitCode: number;
+  toolCalls: ToolCallCapture[];
 }
 
 export interface RpcAgentOptions {
@@ -47,6 +53,7 @@ interface RpcRunState {
   resolve: (value: string) => void;
   reject: (error: Error) => void;
   lastAssistantText: string;
+  toolCalls: ToolCallCapture[];
   onUpdate?: (update: AgentRunUpdate) => void;
   aborted?: boolean;
 }
@@ -105,6 +112,7 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
   args.push(input.task);
 
   const messages: Message[] = [];
+  const toolCalls: ToolCallCapture[] = [];
   let stderr = "";
 
   const exitCode = await new Promise<number>((resolve) => {
@@ -130,6 +138,8 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
       }
 
       if (event.type === "tool_execution_start") {
+        // Capture tool call arguments for structured output
+        toolCalls.push({ name: event.toolName, arguments: event.args ?? {} });
         input.onUpdate?.({ type: "tool_start", toolName: event.toolName, args: event.args });
       }
 
@@ -200,7 +210,7 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
       /* ignore */
     }
 
-  return { outputText, messages, stderr, exitCode };
+  return { outputText, messages, stderr, exitCode, toolCalls };
 }
 
 export class RpcAgent {
@@ -208,12 +218,17 @@ export class RpcAgent {
   private buffer = "";
   private stderr = "";
   private currentRun: RpcRunState | null = null;
+  private lastToolCalls: ToolCallCapture[] = [];
   private options: RpcAgentOptions;
   private tmpPromptDir: string | null = null;
   private tmpPromptPath: string | null = null;
 
   constructor(options: RpcAgentOptions) {
     this.options = options;
+  }
+
+  getLastToolCalls(): ToolCallCapture[] {
+    return this.lastToolCalls;
   }
 
   start(): void {
@@ -270,6 +285,7 @@ export class RpcAgent {
         resolve,
         reject,
         lastAssistantText: "",
+        toolCalls: [],
         onUpdate: options?.onUpdate,
       };
 
@@ -339,6 +355,8 @@ export class RpcAgent {
     }
 
     if (event.type === "tool_execution_start") {
+      // Capture tool call arguments for structured output
+      this.currentRun?.toolCalls.push({ name: event.toolName, arguments: event.args ?? {} });
       this.currentRun?.onUpdate?.({
         type: "tool_start",
         toolName: event.toolName,
@@ -385,6 +403,8 @@ export class RpcAgent {
     if (event.type === "agent_end") {
       const run = this.currentRun;
       if (!run) return;
+      // Save tool calls before clearing currentRun
+      this.lastToolCalls = [...run.toolCalls];
       this.currentRun = null;
       if (run.aborted) return;
       run.resolve(run.lastAssistantText || "");

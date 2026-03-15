@@ -26,13 +26,16 @@ Reload extensions:
 
 ## Key files
 
-- `.pi/extensions/workflow-orchestrator/index.ts` – orchestration logic, commands, PM chat
-- `.pi/extensions/workflow-orchestrator/runner.ts` – subagent execution (JSON + RPC)
-- `.pi/extensions/workflow-orchestrator/render.ts` – UI widget rendering
-- `.pi/extensions/workflow-orchestrator/state.ts` – workflow/task state
-- `.pi/extensions/workflow-orchestrator/config.ts` – workflow schema
-- `.pi/workflows/default.workflow.json` – default workflow config
-- `.pi/agents/*.md` – agent prompts + per-agent models
+- `.pi/extensions/workflow-orchestrator/` – Main orchestration (UI, commands, logic)
+  - `index.ts` – Extension entry point, commands, PM chat routing
+  - `runner.ts` – Subagent execution (RPC mode, tool call capture)
+  - `render.ts` – UI widget rendering
+  - `state.ts` – Workflow/task state persistence
+  - `config.ts` – Workflow JSON schema
+- `.pi/extensions/workflow-pm-tools/index.ts` – `generate_wave` tool for PM
+- `.pi/extensions/workflow-task-tools/index.ts` – `report_task_result` tool for dev/verifier
+- `.pi/workflows/default.workflow.json` – Default workflow config
+- `.pi/agents/*.md` – Agent prompts with per-agent models
 
 ## Common behaviors
 
@@ -42,6 +45,27 @@ Reload extensions:
 - `/workflow message <id> <text>` sends a steer message to the running task, or resumes a stopped task.
 - `/workflow resume` restarts the workflow loop from the saved state without starting new agents automatically.
 - While workflow is active, normal chat is routed to PM (commands still work).
+
+## Session file format
+
+Session files are JSONL (one JSON event per line):
+
+```jsonl
+{"type":"prompt","message":"Project goal: Build a bot\nTask: T1..."}
+{"type":"message_end","message":{"role":"assistant","content":[...]}}
+{"type":"tool_execution_start","toolName":"report_task_result","args":{"status":"done",...}}
+{"type":"agent_end"}
+```
+
+**Key event types:**
+- `prompt` - The prompt sent to the agent
+- `message_end` - Agent's text response
+- `tool_execution_start` - Tool call with arguments (this is captured for structured output)
+- `agent_end` - Agent completed
+
+**Locations:**
+- PM sessions: `.pi/workflows/sessions/pm-<workflow>.jsonl`
+- Task sessions: `.pi/workflows/sessions/<runId>/<taskId>-<stageId>.jsonl`
 
 ## UI notes
 
@@ -70,8 +94,22 @@ use `allowedExtensionsByAgent` to set per-agent allowlists:
 
 ```json
 "allowedExtensionsByAgent": {
-  "pm": ["/absolute/path/to/ext.ts"],
-  "developer": [],
-  "verifier": []
+  "pm": ["./.pi/extensions/workflow-pm-tools/index.ts"],
+  "developer": ["./.pi/extensions/workflow-task-tools/index.ts"],
+  "verifier": ["./.pi/extensions/workflow-task-tools/index.ts"]
 }
 ```
+
+## Tool-based reporting architecture
+
+Agents report via structured tools instead of JSON text:
+
+| Agent | Tool | Purpose |
+|-------|------|---------|
+| PM | `generate_wave` | Report new wave or project completion |
+| Developer | `report_task_result` | Report task done with files/summary |
+| Verifier | `report_task_result` | Report pass/fail with issues |
+
+**Why tools?** Previously, agents output JSON text that was parsed with `extractJson()`. Malformed JSON caused silent failures where verifier reports were lost. Tools provide structured arguments that are captured directly from `tool_execution_start` events.
+
+**Tool isolation:** Each extension provides specific tools, and `allowedExtensionsByAgent` ensures agents only see their relevant tools.

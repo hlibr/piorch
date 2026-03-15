@@ -17,20 +17,24 @@ Customizable PM → Dev → Verifier workflow for **pi** using an extension and 
 
 ```text
 .pi/
-  extensions/workflow-orchestrator/
-    index.ts
-    agents.ts
-    runner.ts
-    config.ts
-    state.ts
-    render.ts
+  extensions/
+    workflow-orchestrator/    # Main orchestration (UI, commands, logic)
+      index.ts
+      agents.ts
+      runner.ts
+      config.ts
+      state.ts
+      render.ts
+    workflow-pm-tools/        # generate_wave tool for PM
+      index.ts
+    workflow-task-tools/      # report_task_result for dev/verifier
+      index.ts
   workflows/
     default.workflow.json
   agents/
     pm.md
     developer.md
     verifier.md
-IMPLEMENTATION.md
 ```
 
 ## Installation
@@ -43,15 +47,15 @@ pi install git:github.com/hlibr/piorch
 
 This automatically installs the extension and agents to your project.
 
-## ⚠️ Important: Configure Models Before Use
+### Configure Models (Optional)
 
-The agents are pre-configured with `gpt-5.4` as a placeholder. You must edit the model settings before starting a workflow:
+Agents come with pre-configured models. To change them:
 
 ```bash
 # Edit agent files to set your preferred models
-nano .pi/agents/pm.md        # Change model: gpt-5.4 to your model
-nano .pi/agents/developer.md # Change model: gpt-5.4 to your model
-nano .pi/agents/verifier.md  # Change model: gpt-5.4 to your model
+nano .pi/agents/pm.md        # Change model: line
+nano .pi/agents/developer.md # Change model: line
+nano .pi/agents/verifier.md  # Change model: line
 ```
 
 Or remove the `model:` line to use Pi's default model.
@@ -65,12 +69,14 @@ pi
 
 ### Option 2: Manual Copy
 
-Copy the extension into your project:
+Copy the extensions and agents into your project:
 
 ```bash
 # From your project directory
 mkdir -p .pi/extensions
 cp -r /path/to/piorch/.pi/extensions/workflow-orchestrator .pi/extensions/
+cp -r /path/to/piorch/.pi/extensions/workflow-pm-tools .pi/extensions/
+cp -r /path/to/piorch/.pi/extensions/workflow-task-tools .pi/extensions/
 cp -r /path/to/piorch/.pi/workflows .pi/
 cp -r /path/to/piorch/.pi/agents .pi/
 ```
@@ -119,28 +125,25 @@ PM replies are shown in the main chat as plain messages.
 
 ## Configuration
 
-### ⚠️ Required: Configure Models First
+### Model Configuration
 
-The extension includes agents pre-configured with `gpt-5.4` as a placeholder. **You must change these before use:**
+Agents have pre-configured models. Customize in `.pi/agents/*.md`:
 
 ```yaml
-# .pi/agents/pm.md
-model: gpt-5.4  # ← Change this to your model
-
 # .pi/agents/developer.md
-model: gpt-5.4  # ← Change this to your model
-
-# .pi/agents/verifier.md
-model: gpt-5.4  # ← Change this to your model
+---
+name: developer
+model: anthropic/claude-sonnet-4-5  # Your preferred model
+tools: read,edit,write,bash
+---
 ```
 
 **Options:**
+1. **Use Pi's default model** - Remove the `model:` line
+2. **Use a specific model** - `anthropic/claude-sonnet-4-5`, `openai/gpt-4o`, `openrouter/deepseek-r1`, etc.
+3. **Use different models per agent** - Set different models for PM, developer, verifier
 
-1. **Use Pi's default model** - Remove the `model:` line entirely
-2. **Use a specific model** - Change to `anthropic/claude-sonnet-4-5`, `openai/gpt-4o`, `openrouter/deepseek-r1`, etc.
-3. **Use different models per agent** - Set different models for PM, developer, and verifier
-
-Run `/reload` after making changes.
+Run `/reload` after changes.
 
 ### Workflow Configuration
 
@@ -225,6 +228,67 @@ model: local-model
 
 Run `/reload` after changing configuration files.
 
+## Tool-Based Reporting
+
+Agents report results via structured tools instead of JSON text:
+
+- **PM** → `generate_wave` tool with wave/tasks structure
+- **Developer** → `report_task_result` tool with `status: "done"`, `filesChanged`, `summary`
+- **Verifier** → `report_task_result` tool with `status: "pass"|"fail"`, `issues`
+
+This eliminates JSON parsing failures that previously caused silent verifier report losses.
+
+Tools are provided by separate extensions:
+- `workflow-pm-tools` → `generate_wave` (PM only)
+- `workflow-task-tools` → `report_task_result` (developer/verifier)
+
+Extension allowlists in `workflow.json` enforce which agents see which tools.
+
+## Workflow Diagram
+
+```
+┌─────────────┐
+│  PM Agent   │
+│ generate_   │
+│    wave     │
+└──────┬──────┘
+       │ Wave: [T1, T2, T3...]
+       ▼
+┌──────────────────────────────────────┐
+│         Parallel Tasks               │
+│  ┌────────┐  ┌────────┐  ┌────────┐ │
+│  │   T1   │  │   T2   │  │   T3   │ │
+│  └───┬────┘  └───┬────┘  └───┬────┘ │
+└──────┼──────────┼──────────┼────────┘
+       │          │          │
+       ▼          ▼          ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│  Developer  │ │  Developer  │ │  Developer  │
+│ report_task │ │ report_task │ │ report_task │
+│   _result   │ │   _result   │ │   _result   │
+└──────┬──────┘ └──────┬──────┘ └──────┬──────┘
+       │               │               │
+       ▼               ▼               ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│  Verifier   │ │  Verifier   │ │  Verifier   │
+│ report_task │ │ report_task │ │ report_task │
+│   _result   │ │   _result   │ │   _result   │
+└──────┬──────┘ └──────┬──────┘ └──────┬──────┘
+       │               │               │
+   pass│           pass│           pass│
+       │          fail │               │
+       ▼               └───────┐       │
+   verified                    │       │
+                               ▼       │
+                        ┌──────────────┘
+                        │ (retry, max 3)
+                        ▼
+                 ┌─────────────┐
+                 │  Developer  │
+                 │   (fixes)   │
+                 └─────────────┘
+```
+
 ## Commands
 
 - `/workflow start <name> [goal]`
@@ -236,13 +300,38 @@ Run `/reload` after changing configuration files.
 - `/workflow collapse`
 - `/workflow help`
 
+## Troubleshooting
+
+**"Extension does not export a valid factory function"**
+- Ensure extensions use `export default function(pi: ExtensionAPI)`
+- Run `/reload` after changes
+
+**Verifier report not appearing, task loops back to developer**
+- This is now fixed with tool-based reporting
+- If it still happens, check `.pi/workflows/sessions/*/T*-verify.jsonl` for the verifier's session log
+
+**PM not generating waves**
+- Check PM session at `.pi/workflows/sessions/pm-*.jsonl`
+- Ensure PM has `generate_wave` tool in `allowedExtensionsByAgent`
+
+**Agent not seeing expected tools**
+- Verify `allowedExtensionsByAgent` in workflow JSON includes the tool extension
+- Tool names in agent.md `tools:` field only filter built-in tools, not extension tools
+
+**Workflow stuck after `/reload`**
+- Stop workflow first: `/workflow stop`
+- Then reload: `/reload`
+- Restart: `/workflow start default "goal"`
+
+**Session files growing large**
+- Safe to delete `.pi/workflows/sessions/` between workflow runs
+- Sessions are per-run, not reused across restarts
+
 ## TODO
 
-- Fix silent task fails
-- Add agent tooling
-- Better UI (colors)
+- Better UI (colors, task grouping)
 - Fix user messages not appearing in chat
-- Expand tasks
+- Expand task management capabilities
 - Add integration tests for RPC runner and end-to-end flows
 - User message routing to PM can swallow chat: no toggle to return to normal chat
 

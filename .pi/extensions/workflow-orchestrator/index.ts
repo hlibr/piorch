@@ -449,8 +449,30 @@ async function processTask(
         },
       });
 
-      const output = extractJson(outputText);
-      return { output, outputText };
+      // Get tool calls from the runner - prefer structured tool output over JSON parsing
+      const toolCalls = runner.agent.getLastToolCalls();
+      let output: any = null;
+
+      // Look for report_task_result or generate_wave tool calls
+      const reportCall = toolCalls.find((tc) => tc.name === "report_task_result");
+      const waveCall = toolCalls.find((tc) => tc.name === "generate_wave");
+
+      if (reportCall) {
+        // Use the tool arguments directly as output
+        output = reportCall.arguments as Record<string, unknown>;
+      } else if (waveCall) {
+        output = waveCall.arguments as Record<string, unknown>;
+      } else {
+        // Fallback to JSON parsing for backward compatibility
+        try {
+          output = extractJson(outputText);
+        } catch {
+          // If no tool was called and JSON parsing fails, return null output
+          output = null;
+        }
+      }
+
+      return { output, outputText, toolCalls };
     },
     applyOutput: (t, stageId, result) => {
       if (!currentState) return; // Guard against workflow stop during execution
@@ -638,12 +660,24 @@ async function generateWaveFromPm(
 ): Promise<{ done: boolean; wave?: WorkflowWave }> {
   const prompt = [
     previousSummary ? `Previous wave summary:\n${previousSummary}` : "No previous wave summary.",
-    "Return the next wave JSON response.",
+    "Call the generate_wave tool with your response.",
   ].join("\n\n");
 
   const outputText = await runPmAgent(pi, config, agents, ctx, signal, prompt);
 
-  const output = extractJson(outputText || "");
+  // Get tool calls from PM runner - prefer structured tool output
+  const runner = getPmRunner(ctx, config, agents);
+  const toolCalls = runner.getLastToolCalls();
+  const waveCall = toolCalls.find((tc) => tc.name === "generate_wave");
+
+  let output: any;
+  if (waveCall) {
+    output = waveCall.arguments as Record<string, unknown>;
+  } else {
+    // Fallback to JSON parsing for backward compatibility
+    output = extractJson(outputText || "");
+  }
+
   if (output.done === true) {
     sendPmMessage(pi, "PM reports: all work is complete.");
     return { done: true };

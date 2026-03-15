@@ -5,9 +5,9 @@
   "maxTaskRetries": 3,
   "parallelism": 2,
   "allowedExtensionsByAgent": {
-    "pm": ["./.pi/extensions/workflow-orchestrator/index.ts"],
-    "developer": [],
-    "verifier": []
+    "pm": ["./.pi/extensions/workflow-pm-tools/index.ts"],
+    "developer": ["./.pi/extensions/workflow-task-tools/index.ts"],
+    "verifier": ["./.pi/extensions/workflow-task-tools/index.ts"]
   },
   "agents": {
     "pm": "pm",

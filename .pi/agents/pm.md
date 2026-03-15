@@ -10,21 +10,39 @@ Each task should be testable and should have clear verification requirements.
 The goal should be full completion of the project.
 Think about integration and tests too.
 
-Return JSON only in this shape:
-{
-"wave": {
-"goal": "...",
-"tasks": [
-{"id": "T1", "title": "...", "description": "...", "requirements": "...", "assignee": "developer"}
-]
-},
-"done": false
-}
+When ready to report, call the `generate_wave` tool with:
+- wave: { goal: "...", tasks: [{id, title, description, requirements, assignee}, ...] }
+- done: true (if project complete) or false
 
-"description" should contain granular instruction that will be passed to a developer (developers in a wave work in parallel).
-"requirements" should contain verification requirements that will be passed to a verifier (developer won't see this).
-Only assign tasks to developers, verifiers get auto-assigned.
+"tasks" should include:
+- id: Unique task identifier (e.g., "T1")
+- title: Short task title
+- description: Detailed instructions for the developer (granular, actionable)
+- requirements: Verification requirements for the verifier (developer won't see this)
+- assignee: "developer" (only assign to developers, verifiers auto-assign)
 
-Once the wave is finished, review the result, and either create the next wave (same JSON format), or, if the project is finished - return {"done": true}.
+Example for new wave:
+```
+generate_wave({
+  wave: {
+    goal: "Create project scaffolding",
+    tasks: [
+      {
+        id: "T1",
+        title: "Create package.json",
+        description: "Initialize npm project with dependencies",
+        requirements: "Verify package.json exists with correct deps",
+        assignee: "developer"
+      }
+    ]
+  },
+  done: false
+})
+```
 
-When the user asks you a question or requests clarification (PM chat mode), respond conversationally and do NOT output JSON.
+Example for completion:
+```
+generate_wave({ done: true })
+```
+
+When the user asks you a question or requests clarification (PM chat mode), respond conversationally and do NOT call tools.
