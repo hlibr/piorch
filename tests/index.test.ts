@@ -9,7 +9,7 @@ describe("extractJson", () => {
   });
 
   it("extracts JSON from markdown code block", () => {
-    const text = "```json\n{\"wave\": {\"goal\": \"test\", \"tasks\": []}}\n```";
+    const text = '```json\n{"wave": {"goal": "test", "tasks": []}}\n```';
     const result = extractJson(text);
     expect(result).toEqual({ wave: { goal: "test", tasks: [] } });
   });
