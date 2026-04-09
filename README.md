@@ -159,6 +159,12 @@ Edit `.pi/workflows/default.workflow.json` to customize:
 - **maxPmRetries** - Retry limit for PM wave generation (default: 3)
 - **allowedExtensions** - Whitelist extensions for all subagents
 - **allowedExtensionsByAgent** - Per-agent extension allowlists
+- **taskFlow.memory.keepDeveloperMemory** - Preserve developer session memory across retries (default: `true`)
+- **taskFlow.memory.keepVerifierMemoryOnDeveloperFailure** - Preserve verifier memory after it returns `fail` and flow goes back to developer (default: `true`)
+- **taskFlow.memory.verifierSelfFailureMemory** - Verifier memory policy when verifier fails **without** transitioning to developer (for example malformed/unmatched output, or verifier runtime errors):
+  - `keep` (default)
+  - `reset`
+  - `reset_on_malformed_output`
 
 Example:
 

@@ -28,6 +28,7 @@ export interface TaskFlowInput<TTask, TOutput> {
     stageId: string,
     output: TOutput | null,
     error?: string,
+    reason?: "verification_failed" | "malformed_output" | "error",
   ) => boolean;
   applyGenericFailure: (task: TTask, error: string) => boolean;
 }
@@ -73,7 +74,7 @@ export async function runTaskFlow<TTask extends { retries: number }, TOutput>(
       input.onError?.(stage, input.task, error instanceof Error ? error : new Error(message));
 
       if (stage.id === "verify") {
-        const retry = input.applyVerifyFailure(input.task, stage.id, null, message);
+        const retry = input.applyVerifyFailure(input.task, stage.id, null, message, "error");
         if (!retry) {
           input.markFailed(input.task, stage.id);
           return;
@@ -93,18 +94,22 @@ export async function runTaskFlow<TTask extends { retries: number }, TOutput>(
     if (input.isStopped?.(input.task)) return;
 
     let nextStageId: string | undefined;
+    const firstStageId = input.startStageId ?? input.stages[0]?.id;
+    let matchedTransition = false;
     if (stage.transitions && stage.transitions.length > 0) {
       const fieldTarget = (output as any)?.output ?? output;
       for (const transition of stage.transitions) {
         const fieldValue = getField(fieldTarget as any, transition.when.field);
         if (String(fieldValue) === transition.when.equals) {
+          matchedTransition = true;
           nextStageId = transition.next;
           break;
         }
       }
-      // If no transition matched (e.g., status is "unknown" or missing), retry verifier
+      // If no transition matched (e.g., status is "unknown" or missing), keep verifier
+      // running and let verify-failure retry handling decide whether to continue/fail.
       if (!nextStageId && stage.id === "verify") {
-        nextStageId = stage.id; // Stay in verify stage
+        nextStageId = stage.id;
       }
     } else {
       nextStageId = getNextStageId(input.stages, stage.id);
@@ -115,9 +120,10 @@ export async function runTaskFlow<TTask extends { retries: number }, TOutput>(
       return;
     }
 
-    const firstStageId = input.startStageId ?? input.stages[0]?.id;
-    if (nextStageId === firstStageId && stage.id === "verify") {
-      const retry = input.applyVerifyFailure(input.task, stage.id, output);
+    if ((nextStageId === firstStageId || nextStageId === stage.id) && stage.id === "verify") {
+      const reason =
+        nextStageId === stage.id && !matchedTransition ? "malformed_output" : "verification_failed";
+      const retry = input.applyVerifyFailure(input.task, stage.id, output, undefined, reason);
       if (!retry) {
         input.markFailed(input.task, stage.id);
         return;
