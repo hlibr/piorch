@@ -537,8 +537,7 @@ async function processTask(
       const keepDeveloperMemory = config.taskFlow.memory?.keepDeveloperMemory ?? true;
       const keepVerifierMemoryOnDeveloperFailure =
         config.taskFlow.memory?.keepVerifierMemoryOnDeveloperFailure ?? true;
-      const verifierSelfFailureMemory =
-        config.taskFlow.memory?.verifierSelfFailureMemory ?? "keep";
+      const verifierSelfFailureMemory = config.taskFlow.memory?.verifierSelfFailureMemory ?? "keep";
 
       if ((reason === "verification_failed" || reason === "error") && !keepDeveloperMemory) {
         resetStageMemory(t, "develop");
@@ -547,7 +546,10 @@ async function processTask(
         resetStageMemory(t, "verify");
       }
       if (reason === "malformed_output") {
-        if (verifierSelfFailureMemory === "reset" || verifierSelfFailureMemory === "reset_on_malformed_output") {
+        if (
+          verifierSelfFailureMemory === "reset" ||
+          verifierSelfFailureMemory === "reset_on_malformed_output"
+        ) {
           resetStageMemory(t, "verify");
         }
       } else if (reason === "error" && verifierSelfFailureMemory === "reset") {
