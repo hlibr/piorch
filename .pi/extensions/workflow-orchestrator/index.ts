@@ -289,6 +289,22 @@ function stopTask(task: TaskState) {
   task.lastNote = "stopped";
 }
 
+function resetStageMemory(task: TaskState, stageId: string) {
+  if (!currentState) return;
+  const key = getRunnerKey(task.id, stageId);
+  const runner = taskRunners.get(key);
+  runner?.agent.dispose();
+  taskRunners.delete(key);
+
+  const workflowDir = path.join(".pi", "workflows", "sessions", currentState.runId);
+  fs.mkdirSync(workflowDir, { recursive: true });
+  if (!task.sessionResetCounts) task.sessionResetCounts = {};
+  const nextReset = (task.sessionResetCounts[stageId] ?? 0) + 1;
+  task.sessionResetCounts[stageId] = nextReset;
+  if (!task.sessionFiles) task.sessionFiles = {};
+  task.sessionFiles[stageId] = path.join(workflowDir, `${task.id}-${stageId}-r${nextReset}.jsonl`);
+}
+
 async function messageTask(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
@@ -507,7 +523,7 @@ async function processTask(
 
       setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
     },
-    applyVerifyFailure: (t, stageId, result, errorMessage) => {
+    applyVerifyFailure: (t, stageId, result, errorMessage, reason = "verification_failed") => {
       if (!currentState) return false; // Guard against workflow stop during execution
       const output = result?.output;
       const issues = output?.issues ?? (errorMessage ? [errorMessage] : []);
@@ -517,6 +533,27 @@ async function processTask(
       t.retries += 1;
       t.lastNote = errorMessage ? `error: ${errorMessage}` : "fail";
       if (errorMessage) t.lastOutput = truncateTicker(errorMessage);
+
+      const keepDeveloperMemory = config.taskFlow.memory?.keepDeveloperMemory ?? true;
+      const keepVerifierMemoryOnDeveloperFailure =
+        config.taskFlow.memory?.keepVerifierMemoryOnDeveloperFailure ?? true;
+      const verifierSelfFailureMemory =
+        config.taskFlow.memory?.verifierSelfFailureMemory ?? "keep";
+
+      if ((reason === "verification_failed" || reason === "error") && !keepDeveloperMemory) {
+        resetStageMemory(t, "develop");
+      }
+      if (reason === "verification_failed" && !keepVerifierMemoryOnDeveloperFailure) {
+        resetStageMemory(t, "verify");
+      }
+      if (reason === "malformed_output") {
+        if (verifierSelfFailureMemory === "reset" || verifierSelfFailureMemory === "reset_on_malformed_output") {
+          resetStageMemory(t, "verify");
+        }
+      } else if (reason === "error" && verifierSelfFailureMemory === "reset") {
+        resetStageMemory(t, "verify");
+      }
+
       setState(pi, ctx, { ...currentState, tasks: [...currentState.tasks] });
       return t.retries <= (config.maxTaskRetries ?? 2);
     },

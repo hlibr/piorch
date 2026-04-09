@@ -37,6 +37,31 @@ describe("loadWorkflowConfig", () => {
     const loaded = loadWorkflowConfig(cwd, name);
     expect(loaded.config.name).toBe("temp");
     expect(loaded.config.parallelism).toBe(1);
+    expect(loaded.config.taskFlow.memory?.keepDeveloperMemory).toBe(true);
+    expect(loaded.config.taskFlow.memory?.keepVerifierMemoryOnDeveloperFailure).toBe(true);
+    expect(loaded.config.taskFlow.memory?.verifierSelfFailureMemory).toBe("keep");
+  });
+
+  it("loads custom task memory policy", () => {
+    const config = {
+      name: "temp",
+      goal: "test",
+      agents: { pm: "pm", developer: "dev", verifier: "ver" },
+      waveSource: { type: "static", staticWaves: [{ goal: "g", tasks: [] }] },
+      taskFlow: {
+        memory: {
+          keepDeveloperMemory: false,
+          keepVerifierMemoryOnDeveloperFailure: false,
+          verifierSelfFailureMemory: "keep",
+        },
+        stages: [{ id: "develop", agent: "dev", inputTemplate: "x", outputSchema: {} }],
+      },
+    };
+    const { cwd, name } = setupTempConfig(JSON.stringify(config));
+    const loaded = loadWorkflowConfig(cwd, name);
+    expect(loaded.config.taskFlow.memory?.keepDeveloperMemory).toBe(false);
+    expect(loaded.config.taskFlow.memory?.keepVerifierMemoryOnDeveloperFailure).toBe(false);
+    expect(loaded.config.taskFlow.memory?.verifierSelfFailureMemory).toBe("keep");
   });
 
   it("accepts requirements and per-agent extensions", () => {

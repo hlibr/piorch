@@ -19,6 +19,18 @@ const StageSchema = Type.Object({
   transitions: Type.Optional(Type.Array(TransitionSchema)),
 });
 
+const TaskFlowMemorySchema = Type.Object({
+  keepDeveloperMemory: Type.Optional(Type.Boolean()),
+  keepVerifierMemoryOnDeveloperFailure: Type.Optional(Type.Boolean()),
+  verifierSelfFailureMemory: Type.Optional(
+    Type.Union([
+      Type.Literal("keep"),
+      Type.Literal("reset"),
+      Type.Literal("reset_on_malformed_output"),
+    ]),
+  ),
+});
+
 const TaskSchema = Type.Object({
   id: Type.String(),
   title: Type.String(),
@@ -54,6 +66,7 @@ const WorkflowSchema = Type.Object({
   waveSource: WaveSourceSchema,
   taskFlow: Type.Object({
     stages: Type.Array(StageSchema),
+    memory: Type.Optional(TaskFlowMemorySchema),
   }),
 });
 
@@ -114,6 +127,12 @@ export function loadWorkflowConfig(cwd: string, name: string): LoadedWorkflow {
   config.maxWaves = config.maxWaves ?? 10;
   config.maxTaskRetries = config.maxTaskRetries ?? 2;
   config.parallelism = config.parallelism ?? 1;
+  config.taskFlow.memory = config.taskFlow.memory ?? {};
+  config.taskFlow.memory.keepDeveloperMemory = config.taskFlow.memory.keepDeveloperMemory ?? true;
+  config.taskFlow.memory.keepVerifierMemoryOnDeveloperFailure =
+    config.taskFlow.memory.keepVerifierMemoryOnDeveloperFailure ?? true;
+  config.taskFlow.memory.verifierSelfFailureMemory =
+    config.taskFlow.memory.verifierSelfFailureMemory ?? "keep";
 
   if (config.parallelism < 1) {
     throw new Error("parallelism must be at least 1");

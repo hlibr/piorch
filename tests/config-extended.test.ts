@@ -245,6 +245,47 @@ describe("config.ts - additional coverage", () => {
     });
   });
 
+  describe("task memory configuration", () => {
+    it("accepts memory configuration values", () => {
+      const config = {
+        name: "test",
+        goal: "test",
+        agents: { pm: "pm", developer: "dev", verifier: "ver" },
+        waveSource: { type: "static", staticWaves: [] },
+        taskFlow: {
+          memory: {
+            keepDeveloperMemory: false,
+            keepVerifierMemoryOnDeveloperFailure: false,
+            verifierSelfFailureMemory: "reset",
+          },
+          stages: [{ id: "s1", agent: "dev", inputTemplate: "t", outputSchema: {} }],
+        },
+      };
+      createWorkflowConfig("test", JSON.stringify(config));
+      const loaded = loadWorkflowConfig(tempDir, "test");
+      expect(loaded.config.taskFlow.memory?.keepDeveloperMemory).toBe(false);
+      expect(loaded.config.taskFlow.memory?.keepVerifierMemoryOnDeveloperFailure).toBe(false);
+      expect(loaded.config.taskFlow.memory?.verifierSelfFailureMemory).toBe("reset");
+    });
+
+    it("rejects invalid verifierSelfFailureMemory values", () => {
+      const config = {
+        name: "test",
+        goal: "test",
+        agents: { pm: "pm", developer: "dev", verifier: "ver" },
+        waveSource: { type: "static", staticWaves: [] },
+        taskFlow: {
+          memory: {
+            verifierSelfFailureMemory: "invalid",
+          },
+          stages: [{ id: "s1", agent: "dev", inputTemplate: "t", outputSchema: {} }],
+        },
+      };
+      createWorkflowConfig("test", JSON.stringify(config));
+      expect(() => loadWorkflowConfig(tempDir, "test")).toThrow();
+    });
+  });
+
   describe("task validation", () => {
     it("accepts task with requirements", () => {
       const config = {

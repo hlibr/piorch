@@ -14,6 +14,7 @@ export interface TaskState extends WorkflowTask {
   lastOutput?: string;
   lastActivityAt?: number;
   sessionFiles?: Record<string, string>;
+  sessionResetCounts?: Record<string, number>;
   resumeMessage?: string;
 }
 

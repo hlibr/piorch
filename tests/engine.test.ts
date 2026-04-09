@@ -121,18 +121,64 @@ describe("runTaskFlow", () => {
   it("retries verifier when status is unknown", async () => {
     const task: TestTask = { id: "T1", status: "pending", retries: 0 };
     let verifyCount = 0;
+    let developCount = 0;
     await runTaskFlow({
       ...baseOptions(task),
       runStage: async (stage) => {
-        if (stage.id === "develop") return { output: { status: "done" }, outputText: "dev" };
+        if (stage.id === "develop") {
+          developCount += 1;
+          return { output: { status: "done" }, outputText: "dev" };
+        }
         verifyCount += 1;
         if (verifyCount === 1)
           return { output: { status: "unknown" }, outputText: "verifier failed to parse" };
         return { output: { status: "pass", issues: [] }, outputText: "verify" };
       },
     });
+    expect(developCount).toBe(1);
     expect(verifyCount).toBe(2);
-    // Note: retries counter is for dev→verify loops, not verify retries
+    expect(task.status).toBe("verified");
+  });
+
+  it("fails when verifier keeps returning unknown status", async () => {
+    const task: TestTask = { id: "T1", status: "pending", retries: 2 };
+    let verifyCount = 0;
+    await runTaskFlow({
+      ...baseOptions(task),
+      maxRetries: 2,
+      runStage: async (stage) => {
+        if (stage.id === "develop") return { output: { status: "done" }, outputText: "dev" };
+        verifyCount += 1;
+        return { output: { status: "unknown" }, outputText: "verifier unknown" };
+      },
+    });
+    expect(verifyCount).toBe(1);
+    expect(task.status).toBe("failed");
+  });
+
+  it("passes verify failure reasons for fail vs malformed outputs", async () => {
+    const task: TestTask = { id: "T1", status: "pending", retries: 0 };
+    const reasons: string[] = [];
+    let verifyCount = 0;
+
+    await runTaskFlow({
+      ...baseOptions(task),
+      applyVerifyFailure: (t, stageId, result, error, reason) => {
+        reasons.push(String(reason));
+        return baseOptions(t).applyVerifyFailure(t, stageId, result, error);
+      },
+      runStage: async (stage) => {
+        if (stage.id === "develop") return { output: { status: "done" }, outputText: "dev" };
+        verifyCount += 1;
+        if (verifyCount === 1) return { output: { status: "unknown" }, outputText: "unknown" };
+        if (verifyCount === 2)
+          return { output: { status: "fail", issues: ["needs fix"] }, outputText: "fail" };
+        return { output: { status: "pass", issues: [] }, outputText: "pass" };
+      },
+    });
+
+    expect(reasons).toContain("malformed_output");
+    expect(reasons).toContain("verification_failed");
     expect(task.status).toBe("verified");
   });
 });
