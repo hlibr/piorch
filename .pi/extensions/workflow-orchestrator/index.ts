@@ -19,6 +19,7 @@ import { runTaskFlow } from "./engine.js";
 import { setPmWidgetStatus, setTaskListExpanded, updateStatus } from "./render.js";
 import { RpcAgent } from "./runner.js";
 import { appendState, restoreState, type TaskState, type WorkflowState } from "./state.js";
+import { materializeProjectDefaults, resolveExtensionPaths } from "./setup.js";
 import { extractJson, normalizeGoal } from "./utils.js";
 
 interface WorkflowRunHandle {
@@ -149,6 +150,12 @@ function sendWorkflowNotice(pi: ExtensionAPI, text: string) {
     content: text,
     display: true,
   });
+}
+
+function reportStartupError(pi: ExtensionAPI, ctx: ExtensionContext, error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  sendWorkflowNotice(pi, `Workflow error: ${message}`);
+  if (ctx.hasUI) ctx.ui.notify(message, "error");
 }
 
 function createClarificationToken(): string {
@@ -314,6 +321,7 @@ function ensurePmSessionFile(state: WorkflowState): string {
 }
 
 function resolveAllowedExtensions(
+  cwd: string,
   agentName: string,
   config: WorkflowConfig,
   state?: WorkflowState,
@@ -323,15 +331,16 @@ function resolveAllowedExtensions(
   const role = Object.entries(config.agents).find(([, name]) => name === agentName)?.[0];
 
   if (role) {
-    return (
+    return resolveExtensionPaths(
+      cwd,
       state?.allowedExtensionsByAgent?.[role as keyof typeof state.allowedExtensionsByAgent] ??
-      config.allowedExtensionsByAgent?.[role as keyof typeof config.allowedExtensionsByAgent] ??
-      state?.allowedExtensions ??
-      config.allowedExtensions
+        config.allowedExtensionsByAgent?.[role as keyof typeof config.allowedExtensionsByAgent] ??
+        state?.allowedExtensions ??
+        config.allowedExtensions,
     );
   }
 
-  return state?.allowedExtensions ?? config.allowedExtensions;
+  return resolveExtensionPaths(cwd, state?.allowedExtensions ?? config.allowedExtensions);
 }
 
 function getRunnerKey(taskId: string, stageId: string): string {
@@ -365,7 +374,7 @@ function getTaskRunner(
     systemPrompt: agent.systemPrompt,
     model: agent.model,
     tools: agent.tools,
-    allowedExtensions: resolveAllowedExtensions(agentName, config, currentState),
+    allowedExtensions: resolveAllowedExtensions(ctx.cwd, agentName, config, currentState),
     retry: config.agentRetry,
   });
 
@@ -741,7 +750,7 @@ function getPmRunner(
     systemPrompt: pmAgent.systemPrompt,
     model: pmAgent.model,
     tools: pmAgent.tools,
-    allowedExtensions: resolveAllowedExtensions(pmAgent.name, config, currentState),
+    allowedExtensions: resolveAllowedExtensions(ctx.cwd, pmAgent.name, config, currentState),
     retry: config.agentRetry,
   });
   return pmRunner;
@@ -908,6 +917,7 @@ async function resumeWorkflow(pi: ExtensionAPI, ctx: ExtensionCommandContext): P
     return;
   }
 
+  materializeProjectDefaults(ctx.cwd);
   const { config } = loadWorkflowConfig(ctx.cwd, currentState.workflowName);
   const { agents } = discoverAgents(ctx.cwd);
   const effectiveConfig: WorkflowConfig = { ...config, goal: currentState.goal };
@@ -1029,6 +1039,7 @@ async function startWorkflow(
     return;
   }
 
+  materializeProjectDefaults(ctx.cwd);
   const { config } = loadWorkflowConfig(ctx.cwd, workflowName);
   const { agents } = discoverAgents(ctx.cwd);
   const effectiveConfig: WorkflowConfig = {
@@ -1285,12 +1296,14 @@ export default function (pi: ExtensionAPI) {
           ctx.ui?.notify("Existing workflow state found. Use /workflow resume.", "warning");
           return;
         }
-        void startWorkflow(pi, ctx, name, goalText);
+        void startWorkflow(pi, ctx, name, goalText).catch((error: unknown) =>
+          reportStartupError(pi, ctx, error),
+        );
         return;
       }
 
       if (command === "resume") {
-        void resumeWorkflow(pi, ctx);
+        void resumeWorkflow(pi, ctx).catch((error: unknown) => reportStartupError(pi, ctx, error));
         return;
       }
 

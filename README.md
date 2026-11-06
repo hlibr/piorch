@@ -45,11 +45,11 @@ Customizable PM → Dev → Verifier workflow for **pi** using an extension and 
 pi install git:github.com/hlibr/piorch
 ```
 
-This automatically installs the extension and agents to your project.
+On the first `/workflow start` or `/workflow resume`, missing workflow and agent defaults are copied into your project's `.pi/` directory. Existing files are kept. Reporting-tool extensions are loaded from the installed package unless your project provides them.
 
 ### Configure Models (Optional)
 
-Agents come with pre-configured models. To change them:
+Agents come with pre-configured models. After the first start creates the editable agent files, change them as needed:
 
 ```bash
 # Edit agent files to set your preferred models

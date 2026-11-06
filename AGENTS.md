@@ -18,6 +18,8 @@ Then:
 /workflow start default "Your goal"
 ```
 
+The first start or resume copies missing workflow and agent defaults into `.pi/` without overwriting project files. Reporting extensions use project files when present and otherwise resolve from the installed package.
+
 Reload extensions:
 
 ```
